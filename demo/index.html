@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <meta name="robots" content="noindex" />
+    <title>ตัวอย่างกิจกรรม — คำถามชวนคิด</title>
+    <link rel="stylesheet" href="../app.css" />
+  </head>
+  <body>
+    <main id="app"></main>
+
+    <script src="../quiz.js"></script>
+    <script>
+      /**
+       * /demo — the same 3-question activity with every Dreambook dependency
+       * removed: no ?token, no JWT verification, no JWKS fetch, no callback,
+       * no redirect. Nothing here talks to a backend, so it can be opened
+       * cold by anyone (sales demo, design review, offline).
+       *
+       * The questions and quiz rendering come from quiz.js — identical to what
+       * a real student sees. Only the bookends differ.
+       */
+
+      const { QUESTIONS, AWARD_SVG, el, renderQuiz } = QuizKit;
+
+      const app = document.getElementById('app');
+      const DEMO_NAME = 'เพื่อนนักทดลอง';
+
+      function start() {
+        renderQuiz(app, {
+          name: DEMO_NAME,
+          tag: 'ตัวอย่าง',
+          tagClass: 'demo-tag',
+          subtitle: 'โหมดทดลอง ไม่เชื่อมต่อระบบจริง',
+          onDone: showAward,
+        });
+      }
+
+      function showAward() {
+        app.innerHTML = '';
+        app.append(
+          el(`<header class="header enter">
+                <h1 class="large-title">เก่งมาก</h1>
+                <p class="subhead"><span class="demo-tag">ตัวอย่าง</span>จบกิจกรรมแล้ว</p>
+              </header>`),
+        );
+
+        const card = el(`<section class="group enter-2">
+              ${AWARD_SVG}
+              <div class="award-copy center">
+                <h2 class="title-3">กิจกรรมสำเร็จ</h2>
+                <p class="subhead">ตอบถูกครบ ${QUESTIONS.length} ข้อ</p>
+                <p class="footnote">โหมดทดลอง — ไม่มีการส่งผลหรือแจกเหรียญจริง</p>
+              </div>
+            </section>`);
+        app.append(card);
+
+        const again = el('<button class="btn" type="button" style="margin-top:20px">เล่นอีกครั้ง</button>');
+        again.addEventListener('click', start);
+        app.append(again);
+      }
+
+      start();
+    </script>
+  </body>
+</html>

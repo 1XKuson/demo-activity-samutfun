@@ -1,0 +1,275 @@
+/* Apple HIG tokens: system colours, both appearances. */
+:root {
+  --blue: #007aff;
+  --green: #34c759;
+  --red: #ff3b30;
+  --bg: #f2f2f7;
+  --group: #ffffff;
+  --label: #000000;
+  --label-2: rgba(60, 60, 67, 0.6);
+  --label-3: rgba(60, 60, 67, 0.3);
+  --separator: rgba(60, 60, 67, 0.29);
+  --fill: rgba(120, 120, 128, 0.12);
+  --fill-strong: rgba(120, 120, 128, 0.2);
+  --blue-tint: rgba(0, 122, 255, 0.12);
+  --red-tint: rgba(255, 59, 48, 0.12);
+  --radius: 14px;
+  --spring: cubic-bezier(0.32, 1.4, 0.6, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --blue: #0a84ff;
+    --green: #30d158;
+    --red: #ff453a;
+    --bg: #000000;
+    --group: #1c1c1e;
+    --label: #ffffff;
+    --label-2: rgba(235, 235, 245, 0.6);
+    --label-3: rgba(235, 235, 245, 0.3);
+    --separator: rgba(84, 84, 88, 0.65);
+    --fill: rgba(120, 120, 128, 0.24);
+    --fill-strong: rgba(120, 120, 128, 0.36);
+    --blue-tint: rgba(10, 132, 255, 0.18);
+    --red-tint: rgba(255, 69, 58, 0.18);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--label);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+    "Noto Sans Thai", sans-serif;
+  font-size: 17px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  justify-content: center;
+  padding: max(24px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+}
+main { width: 100%; max-width: 480px; }
+
+/* ---------- type ---------- */
+.large-title {
+  font-size: 34px;
+  line-height: 1.24;
+  font-weight: 700;
+  letter-spacing: 0.37px;
+  margin: 0;
+}
+.title-3 { font-size: 20px; line-height: 1.4; font-weight: 600; margin: 0; }
+.headline { font-size: 17px; line-height: 1.45; font-weight: 600; margin: 0; }
+.subhead { font-size: 15px; line-height: 1.45; color: var(--label-2); margin: 0; }
+.footnote { font-size: 13px; line-height: 1.4; color: var(--label-2); margin: 0; }
+.center { text-align: center; }
+
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---------- header ---------- */
+.header { padding: 8px 4px 20px; }
+.header .subhead { margin-top: 6px; }
+.class-tag {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  background: var(--blue-tint);
+  border-radius: 999px;
+  padding: 3px 10px;
+  margin-right: 8px;
+  vertical-align: 1px;
+}
+
+/* ---------- grouped container ---------- */
+.group {
+  background: var(--group);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.group + .group { margin-top: 20px; }
+.group-pad { padding: 20px; }
+
+/* ---------- progress ---------- */
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 0.5px solid var(--separator);
+}
+.bars { display: flex; gap: 5px; flex: 1; }
+.bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--fill-strong);
+  overflow: hidden;
+}
+.bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: var(--blue);
+  transition: width 0.45s var(--spring);
+}
+.bar.done span { width: 100%; }
+.steps .footnote { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------- question + choices ---------- */
+.question { padding: 20px 20px 14px; }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li + li .row { border-top: 0.5px solid var(--separator); }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 52px;
+  padding: 13px 20px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+.row:hover:not(:disabled) { background: var(--fill); }
+.row:active:not(:disabled) { background: var(--fill-strong); transform: scale(0.985); }
+.row:focus-visible { outline: 3px solid var(--blue); outline-offset: -3px; }
+.row:disabled { cursor: default; }
+
+.key {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--label-2);
+  background: var(--fill);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+.row .text { flex: 1; }
+.mark { flex: none; width: 22px; height: 22px; opacity: 0; transition: opacity 0.2s ease; }
+.mark svg { display: block; width: 100%; height: 100%; }
+
+.row[data-state="right"] { background: var(--blue-tint); }
+.row[data-state="right"] .key { background: var(--blue); color: #fff; }
+.row[data-state="right"] .mark { opacity: 1; color: var(--blue); }
+.row[data-state="wrong"] { background: var(--red-tint); }
+.row[data-state="wrong"] .key { background: var(--red); color: #fff; }
+.row[data-state="wrong"] .mark { opacity: 1; color: var(--red); }
+.row[data-state="wrong"] { animation: nudge 0.4s ease; }
+.row:disabled:not([data-state]) { opacity: 0.4; }
+
+.feedback {
+  min-height: 20px;
+  padding: 12px 20px 18px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.feedback.good { color: var(--green); }
+.feedback.bad { color: var(--red); }
+
+/* ---------- award (the one loud moment) ---------- */
+.award { display: grid; place-items: center; padding: 32px 20px 8px; }
+.award svg { width: 132px; height: 132px; overflow: visible; }
+.ring {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 358;
+  stroke-dashoffset: 358;
+  animation: draw-ring 0.7s ease-out forwards;
+}
+.tick {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* path length ≈ 71; keep the dash longer than the path so the tail draws */
+  stroke-dasharray: 74;
+  stroke-dashoffset: 74;
+  animation: draw-tick 0.4s ease-out 0.55s forwards;
+}
+.award-copy { padding: 12px 20px 20px; display: grid; gap: 6px; }
+
+/* ---------- states ---------- */
+.spinner {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--fill-strong);
+  border-top-color: var(--label-2);
+  animation: spin 0.8s linear infinite;
+}
+.loading { display: flex; align-items: center; gap: 12px; }
+.error-text { color: var(--red); }
+
+/* ---------- motion ---------- */
+.enter { animation: rise 0.45s var(--spring) both; }
+.enter-2 { animation: rise 0.45s var(--spring) 0.08s both; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes nudge {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+@keyframes draw-ring { to { stroke-dashoffset: 0; } }
+@keyframes draw-tick { to { stroke-dashoffset: 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ---------- filled button (demo route only: replay, no callback) ---------- */
+.btn {
+  display: block;
+  width: 100%;
+  min-height: 50px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--blue);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+.btn:hover { opacity: 0.9; }
+.btn:active { transform: scale(0.985); }
+.btn:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+.btn.secondary { background: var(--fill); color: var(--blue); }
+
+/* Neutral counterpart to .class-tag — marks the page as sandboxed. */
+.demo-tag {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label-2);
+  background: var(--fill);
+  border-radius: 999px;
+  padding: 3px 10px;
+  margin-right: 8px;
+  vertical-align: 1px;
+}

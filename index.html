@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <title>คำถามชวนคิด — ตอบให้ครบ 3 ข้อ</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <main id="app">
+      <div class="group group-pad">
+        <p class="loading subhead"><span class="spinner"></span>กำลังเปิดกิจกรรม</p>
+      </div>
+    </main>
+
+    <script src="quiz.js"></script>
+    <script>
+      /**
+       * Demo Activity — the smallest possible Dreambook external activity.
+       * Answer 3 questions correctly => the run is complete.
+       *
+       * Implements documents/activity-integration-guideline.md:
+       *   1. read ?token         (launch JWT, RS256)
+       *   2. verify it against <api>/.well-known/jwks.json  (WebCrypto, kid-matched)
+       *   3. GET  /activities/:id/student-context  with the report_token
+       *   4. PUT  /activities/:id/progress         when all 3 are right
+       *   5. redirect to <return>/?sticker=<stickerId>
+       *
+       * No build step and no backend of its own: serve this file statically.
+       * The questions and quiz rendering live in quiz.js, shared with /demo.
+       */
+
+      const { QUESTIONS, AWARD_SVG, el, esc, renderQuiz } = QuizKit;
+
+      // ---------- config ----------
+      const QS = new URLSearchParams(location.search);
+      // ?api= lets you point at a deployed backend without editing the file.
+      const API = (QS.get('api') || 'http://localhost:3000').replace(/\/$/, '');
+      const EXPECTED_ISS = QS.get('iss') || 'dreambook';
+      const EXPECTED_AUD = QS.get('aud') || 'demo-activity';
+      const RESULT_ID = 'demo-quiz-v1'; // opaque to Dreambook; lets the app reopen this result
+      // Where to send the student once progress is reported. Default '' → the
+      // current origin's root (`/?sticker=…`), which is what the Dreambook web app
+      // reads to open the sticker detail. ?return=https://app.example lets dev
+      // point back at a web app served from another origin/port.
+      const RETURN_BASE = (QS.get('return') || '').replace(/\/+$/, '');
+      const REDIRECT_DELAY_MS = 1500;
+
+      /** Build the post-completion URL: <return>/?sticker=<stickerId>. */
+      const returnUrl = (stickerId) =>
+        `${RETURN_BASE}/${stickerId ? `?sticker=${encodeURIComponent(stickerId)}` : ''}`;
+
+      const app = document.getElementById('app');
+
+      const fail = (msg, detail) => {
+        app.innerHTML = '';
+        app.append(
+          el(`<div class="group group-pad enter">
+                <h1 class="title-3">เปิดกิจกรรมไม่ได้</h1>
+                <p class="subhead error-text" style="margin-top:8px">${esc(msg)}</p>
+                ${detail ? `<p class="footnote" style="margin-top:6px">${esc(detail)}</p>` : ''}
+                <p class="footnote" style="margin-top:14px">เปิดกิจกรรมนี้จากปุ่มเล่นกิจกรรมในแอป Dreambook</p>
+              </div>`),
+        );
+      };
+
+      // ---------- JWT verify ----------
+      const b64urlToBytes = (s) => {
+        const b64 = s.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(s.length / 4) * 4, '=');
+        return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      };
+      const b64urlToJson = (s) => JSON.parse(new TextDecoder().decode(b64urlToBytes(s)));
+
+      async function fetchJwks() {
+        const res = await fetch(`${API}/.well-known/jwks.json`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`JWKS ${res.status}`);
+        return res.json();
+      }
+
+      /**
+       * Verify the launch JWT. Security checklist (guideline §5):
+       * RS256 only, signature against the kid-matched key, iss/aud/exp checked,
+       * jti single-use. Throws with a human-readable reason.
+       */
+      async function verifyLaunchToken(token) {
+        const parts = token.split('.');
+        if (parts.length !== 3) throw new Error('token ไม่ใช่ JWT');
+        const [rawHeader, rawPayload, rawSig] = parts;
+
+        const header = b64urlToJson(rawHeader);
+        // Reject `none`/HS256 before touching any key material (alg-confusion).
+        if (header.alg !== 'RS256') throw new Error(`alg=${header.alg} ไม่ได้รับอนุญาต (ต้องเป็น RS256)`);
+
+        const jwks = await fetchJwks();
+        const jwk = (jwks.keys || []).find((k) => !header.kid || k.kid === header.kid);
+        if (!jwk) throw new Error(`ไม่พบ public key ที่ตรงกับ kid=${header.kid}`);
+
+        const key = await crypto.subtle.importKey(
+          'jwk',
+          { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
+          { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+          false,
+          ['verify'],
+        );
+        const ok = await crypto.subtle.verify(
+          'RSASSA-PKCS1-v1_5',
+          key,
+          b64urlToBytes(rawSig),
+          new TextEncoder().encode(`${rawHeader}.${rawPayload}`),
+        );
+        if (!ok) throw new Error('ลายเซ็นไม่ถูกต้อง');
+
+        const claims = b64urlToJson(rawPayload);
+        if (claims.iss !== EXPECTED_ISS) throw new Error(`iss=${claims.iss} ไม่ตรงกับ ${EXPECTED_ISS}`);
+        const auds = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+        if (!auds.includes(EXPECTED_AUD)) throw new Error(`aud=${claims.aud} ไม่ตรงกับ ${EXPECTED_AUD}`);
+        const now = Math.floor(Date.now() / 1000);
+        if (typeof claims.exp !== 'number' || claims.exp <= now) throw new Error('token หมดอายุแล้ว');
+        if (!claims.activity_id || !claims.report_token) throw new Error('token ไม่มี activity_id/report_token');
+
+        // Single-use: a launch token replayed from history must not start a new run.
+        if (claims.jti) {
+          const seenKey = `demo-activity:jti:${claims.jti}`;
+          if (localStorage.getItem(seenKey)) throw new Error('token นี้ถูกใช้ไปแล้ว (เปิดกิจกรรมใหม่จากแอป)');
+          localStorage.setItem(seenKey, String(now));
+        }
+        return claims;
+      }
+
+      // ---------- Dreambook callbacks ----------
+      const callback = async (method, path, reportToken, body) => {
+        const res = await fetch(`${API}${path}`, {
+          method,
+          headers: {
+            Authorization: `Bearer ${reportToken}`,
+            ...(body ? { 'Content-Type': 'application/json' } : {}),
+          },
+          ...(body ? { body: JSON.stringify(body) } : {}),
+        });
+        if (!res.ok) throw new Error(`${method} ${path} → ${res.status} ${await res.text()}`);
+        return res.json();
+      };
+
+      // ---------- quiz UI ----------
+      function startQuiz(claims, ctx) {
+        const name = ctx?.nickname || claims.name || 'เพื่อน';
+        renderQuiz(app, {
+          name,
+          tag: ctx?.gradeLevel || claims.class || null,
+          onDone: () => finish(claims, name),
+        });
+      }
+
+      async function finish(claims, name) {
+        app.innerHTML = '';
+        app.append(
+          el(`<header class="header">
+                <h1 class="large-title">เก่งมาก ${esc(name)}</h1>
+                <p class="subhead">กำลังส่งผลกลับ Dreambook</p>
+              </header>`),
+        );
+        const card = el('<section class="group group-pad"><p class="loading subhead"><span class="spinner"></span>กำลังบันทึกผล</p></section>');
+        app.append(card);
+
+        try {
+          const result = await callback(
+            'PUT',
+            `/activities/${encodeURIComponent(claims.activity_id)}/progress`,
+            claims.report_token,
+            {
+              result_id: RESULT_ID,
+              submission: { correct: QUESTIONS.length, total: QUESTIONS.length },
+            },
+          );
+          // The reward is a StickerView; its id is what the app's journal reads
+          // from ?sticker= to open that sticker. Null when the activity instance
+          // carries no reward — then we just return to the app root.
+          const stickerId = result.reward?.id || null;
+          const next = returnUrl(stickerId);
+
+          card.innerHTML = '';
+          card.className = 'group';
+          card.append(
+            el(`<div>
+                  ${AWARD_SVG}
+                  <div class="award-copy center">
+                    <h2 class="title-3">กิจกรรมสำเร็จ</h2>
+                    <p class="subhead">ตอบถูกครบ ${QUESTIONS.length} ข้อ${result.reward ? ' · ได้รับเหรียญแล้ว' : ''}</p>
+                    <p class="footnote">กำลังกลับไปที่ Dreambook · <a href="${esc(next)}">กลับเลย</a></p>
+                  </div>
+                </div>`),
+          );
+          // replace(), not assign(): the launch token is single-use, so Back must
+          // not land on a URL that now fails jti replay checks.
+          setTimeout(() => location.replace(next), REDIRECT_DELAY_MS);
+        } catch (err) {
+          card.innerHTML = '';
+          card.className = 'group group-pad';
+          card.append(
+            el(`<div>
+                  <h2 class="title-3">ส่งผลไม่สำเร็จ</h2>
+                  <p class="subhead error-text" style="margin-top:8px">${esc(err.message)}</p>
+                  <p class="footnote" style="margin-top:14px">report_token อายุ ~3 ชม. ถ้าหมดอายุ ให้เปิดกิจกรรมใหม่จากแอป</p>
+                </div>`),
+          );
+        }
+      }
+
+      // ---------- bootstrap ----------
+      (async () => {
+        const token = QS.get('token');
+        if (!token) return fail('ไม่พบ token ใน URL', 'ต้องเปิดด้วย ?token=<launch JWT>');
+
+        let claims;
+        try {
+          claims = await verifyLaunchToken(token);
+        } catch (err) {
+          return fail('ตรวจสอบ token ไม่ผ่าน', err.message);
+        }
+
+        // Nice-to-have: if student-context fails we still run the quiz on JWT claims.
+        let ctx = null;
+        try {
+          ctx = await callback(
+            'GET',
+            `/activities/${encodeURIComponent(claims.activity_id)}/student-context`,
+            claims.report_token,
+          );
+        } catch (err) {
+          console.warn('student-context failed, falling back to JWT claims:', err.message);
+        }
+        startQuiz(claims, ctx);
+      })();
+    </script>
+  </body>
+</html>
