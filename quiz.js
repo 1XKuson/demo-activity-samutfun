@@ -59,8 +59,7 @@
    * @param {string}  [opts.tag]      pill before the subtitle (class level, or "ตัวอย่าง")
    * @param {string}  [opts.tagClass] 'class-tag' (real) or 'demo-tag' (sandbox)
    * @param {string}  [opts.subtitle]
-   * @param {Function} opts.onDone    called with the finished run (see `run`) once
-   *                                  every question has been answered right
+   * @param {Function} opts.onDone    called once all questions are answered right
    */
   function renderQuiz(app, opts) {
     const { name, tag = null, tagClass = 'class-tag', onDone } = opts;
@@ -86,11 +85,6 @@
     QUESTIONS.forEach(() => bars.append(el('<div class="bar"><span></span></div>')));
     quiz.append(steps);
 
-    // One bitmask per question: bit i set once choice i has been tapped. The
-    // correct bit is always set at the end (you can't move on without it), so
-    // popcount - 1 is how many wrong choices were tried.
-    const run = QUESTIONS.map(() => 0);
-
     let index = 0;
     const step = () => {
       [...quiz.children].slice(1).forEach((n) => n.remove());
@@ -111,7 +105,6 @@
             </button></li>`);
         const btn = row.querySelector('.row');
         btn.addEventListener('click', () => {
-          run[index] |= 1 << i;
           if (i === item.answer) {
             btn.dataset.state = 'right';
             btn.querySelector('.mark').innerHTML = CHECK_ICON;
@@ -120,7 +113,7 @@
             feedback.textContent = 'ถูกต้อง';
             list.querySelectorAll('.row').forEach((b) => (b.disabled = true));
             index += 1;
-            setTimeout(() => (index < QUESTIONS.length ? step() : onDone(run)), 550);
+            setTimeout(() => (index < QUESTIONS.length ? step() : onDone()), 550);
           } else {
             // Retry until right — no penalty, no scoring. This activity only
             // exists to prove the launch/callback loop works end to end.
@@ -139,52 +132,28 @@
     step();
   }
 
-  // ---------- run encoding ----------
-  // A run is one hex digit per question (the 4-choice bitmask), so it survives a
-  // round trip through Dreambook as the `result_id` string and needs no storage
-  // of our own: the result page rebuilds the whole review from it.
-  const RESULT_PREFIX = 'v1.';
-
-  /** Encode a finished run into the `result_id` reported to Dreambook. */
-  const encodeRun = (run) => RESULT_PREFIX + run.map((mask) => (mask & 0xf).toString(16)).join('');
-
-  /** Inverse of `encodeRun`. Null when the id isn't ours or the question set has
-   *  changed under it — the caller shows "no details" rather than a wrong review. */
-  function decodeRun(resultId) {
-    if (typeof resultId !== 'string' || !resultId.startsWith(RESULT_PREFIX)) return null;
-    const digits = resultId.slice(RESULT_PREFIX.length);
-    if (digits.length !== QUESTIONS.length || !/^[0-9a-f]+$/.test(digits)) return null;
-    const run = [...digits].map((d) => parseInt(d, 16));
-    // Every question must record the correct choice; anything else is a stale id.
-    return run.every((mask, i) => mask & (1 << QUESTIONS[i].answer)) ? run : null;
-  }
-
-  /** How many questions were right on the first tap. */
-  const firstTryCount = (run) => run.filter((mask) => (mask & (mask - 1)) === 0).length;
-
   /**
-   * Render the answer review: every question with its correct choice, and the
-   * wrong ones the student tried along the way. Read-only — no click handlers,
-   * so the same markup is safe on the reopened result page.
+   * Render the answer key: all three questions with the correct choice marked.
+   * The same for every student and every run — nothing about who played or how
+   * they did — so the result page can render it with no state at all.
+   *
+   * Read-only markup (no click handlers), reusing the quiz's own row styling so
+   * the choices read the same way they did during the quiz.
    */
-  function renderReview(container, run) {
+  function renderAnswerKey(container) {
     const section = el('<section class="group review"></section>');
     section.append(
       el(`<div class="review-head">
-            <h2 class="headline">ทบทวนคำตอบ</h2>
-            <p class="footnote">ตอบถูกตั้งแต่ครั้งแรก ${firstTryCount(run)} จาก ${QUESTIONS.length} ข้อ</p>
+            <h2 class="headline">เฉลยคำถาม</h2>
+            <p class="footnote">คำตอบที่ถูกต้องของทั้ง ${QUESTIONS.length} ข้อ</p>
           </div>`),
     );
 
     QUESTIONS.forEach((item, qi) => {
-      const mask = run[qi];
-      const wrongTried = item.choices.filter((_, i) => i !== item.answer && mask & (1 << i)).length;
       const block = el('<div class="review-item"></div>');
       block.append(
         el(`<div class="review-q">
-              <p class="footnote">ข้อ ${qi + 1}<span class="${wrongTried ? 'retry-tag' : 'first-tag'}">${
-                wrongTried ? `ลองผิด ${wrongTried} ครั้ง` : 'ถูกครั้งแรก'
-              }</span></p>
+              <p class="footnote">ข้อ ${qi + 1}</p>
               <h3 class="headline">${esc(item.q)}</h3>
             </div>`),
       );
@@ -192,15 +161,11 @@
       const list = el('<ul class="list"></ul>');
       item.choices.forEach((choice, i) => {
         const isAnswer = i === item.answer;
-        const wasTried = Boolean(mask & (1 << i));
-        // Only the answer and the wrong picks are marked; untouched choices stay
-        // plain so the eye lands on what actually happened.
-        const state = isAnswer ? ' data-state="right"' : wasTried ? ' data-state="wrong"' : '';
         list.append(
-          el(`<li><div class="row"${state}>
+          el(`<li><div class="row"${isAnswer ? ' data-state="right"' : ''}>
                 <span class="key">${KEYS[i]}</span>
                 <span class="text">${esc(choice)}</span>
-                <span class="mark">${isAnswer ? CHECK_ICON : wasTried ? CLOSE_ICON : ''}</span>
+                <span class="mark">${isAnswer ? CHECK_ICON : ''}</span>
               </div></li>`),
         );
       });
@@ -221,9 +186,6 @@
     el,
     esc,
     renderQuiz,
-    renderReview,
-    encodeRun,
-    decodeRun,
-    firstTryCount,
+    renderAnswerKey,
   };
 })(window);

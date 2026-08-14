@@ -35,8 +35,7 @@
        * The questions and quiz rendering live in quiz.js, shared with /demo.
        */
 
-      const { QUESTIONS, AWARD_SVG, el, esc, renderQuiz, renderReview, encodeRun, firstTryCount } =
-        QuizKit;
+      const { QUESTIONS, AWARD_SVG, el, esc, renderQuiz } = QuizKit;
 
       // ---------- config ----------
       const QS = new URLSearchParams(location.search);
@@ -48,14 +47,16 @@
         /^https:\/\//.test(API) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(API);
       const EXPECTED_ISS = QS.get('iss') || 'dreambook';
       const EXPECTED_AUD = QS.get('aud') || 'demo-activity';
-      // result_id is opaque to Dreambook and comes back to us in the reopen URL
-      // (/activity/result/<result_id>), so the run itself is encoded into it —
-      // that's the only way a backendless activity can rebuild the review later.
+      // Opaque to Dreambook. It comes back to us in the reopen URL
+      // (/activity/result/<result_id>), which serves the answer key — the same
+      // page for every run, so one constant is all this needs to be.
+      const RESULT_ID = 'demo-quiz-v1';
       // Where to send the student once progress is reported. Default '' → the
       // current origin's root (`/?sticker=…`), which is what the Dreambook web app
       // reads to open the sticker detail. ?return=https://app.example lets dev
       // point back at a web app served from another origin/port.
       const RETURN_BASE = (QS.get('return') || '').replace(/\/+$/, '');
+      const REDIRECT_DELAY_MS = 1500;
       // Launch TTL is capped at 900s on the Dreambook side; reject anything
       // longer-lived, whatever the token claims (guideline §4).
       const MAX_TOKEN_TTL_SEC = 900;
@@ -190,12 +191,11 @@
         renderQuiz(app, {
           name,
           tag: ctx?.gradeLevel || claims.class || null,
-          onDone: (run) => finish(claims, name, run),
+          onDone: () => finish(claims, name),
         });
       }
 
-      async function finish(claims, name, run) {
-        const resultId = encodeRun(run);
+      async function finish(claims, name) {
         app.innerHTML = '';
         app.append(
           el(`<header class="header">
@@ -212,19 +212,8 @@
             `/activities/${encodeURIComponent(claims.activity_id)}/progress`,
             claims.report_token,
             {
-              result_id: resultId,
-              // Opaque to Dreambook (guideline §3.4). Choice indices only — no
-              // answer text, nothing about the student.
-              submission: {
-                correct: QUESTIONS.length,
-                total: QUESTIONS.length,
-                first_try: firstTryCount(run),
-                answers: QUESTIONS.map((q, i) => ({
-                  question: i + 1,
-                  correct_choice: q.answer,
-                  tried: q.choices.map((_, c) => c).filter((c) => run[i] & (1 << c)),
-                })),
-              },
+              result_id: RESULT_ID,
+              submission: { correct: QUESTIONS.length, total: QUESTIONS.length },
             },
           );
           // The reward is a StickerView; its id is what the app's journal reads
@@ -241,31 +230,23 @@
                   <div class="award-copy center">
                     <h2 class="title-3">กิจกรรมสำเร็จ</h2>
                     <p class="subhead">ตอบถูกครบ ${QUESTIONS.length} ข้อ${result.reward ? ' · ได้รับเหรียญแล้ว' : ''}</p>
-                    <p class="footnote">${EMBEDDED ? 'กำลังกลับไปที่ Dreambook' : 'ทบทวนคำตอบได้ด้านล่าง'}</p>
+                    <p class="footnote">${EMBEDDED ? 'กำลังกลับไปที่ Dreambook' : `กำลังกลับไปที่ Dreambook · <a href="${esc(next)}">กลับเลย</a>`}</p>
                   </div>
                 </div>`),
           );
 
           // Only now that the PUT returned 2xx — announcing earlier makes the app
           // look for a sticker the backend hasn't written yet (guideline §3.5).
-          // The same review the student gets when they reopen this sticker
-          // later. Embedded, the app tears the iframe down right after the
-          // event below — standalone, this is the end of the run.
-          renderReview(app, run);
-
           if (EMBEDDED) {
             postToApp('activity_finished', {
-              result_id: resultId,
+              result_id: RESULT_ID,
               ...(stickerId ? { sticker_code: stickerId } : {}),
             });
           } else {
-            // Standalone: nobody is listening for the event, and the review
-            // below is worth reading, so offer the trip back instead of taking
-            // it. replace(), not assign(): the launch token is single-use, so
-            // Back must not land on a URL that now fails the jti replay check.
-            const back = el('<button class="btn secondary" type="button" style="margin-top:20px">กลับไปที่ Dreambook</button>');
-            back.addEventListener('click', () => location.replace(next));
-            app.append(back);
+            // Standalone: nobody is listening, so navigate there ourselves.
+            // replace(), not assign(): the launch token is single-use, so Back
+            // must not land on a URL that now fails jti replay checks.
+            setTimeout(() => location.replace(next), REDIRECT_DELAY_MS);
           }
         } catch (err) {
           // Recoverable — the answers are still in hand, so offer a retry rather
@@ -280,7 +261,7 @@
                 </div>`),
           );
           const retry = el('<button class="btn" type="button" style="margin-top:20px">ลองส่งใหม่</button>');
-          retry.addEventListener('click', () => finish(claims, name, run));
+          retry.addEventListener('click', () => finish(claims, name));
           app.append(retry);
         }
       }

@@ -7,15 +7,15 @@
     <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
     <meta name="robots" content="noindex" />
-    <title>ผลกิจกรรม — คำถามชวนคิด</title>
+    <title>เฉลยกิจกรรม — คำถามชวนคิด</title>
     <link rel="stylesheet" href="../../app.css" />
   </head>
   <body>
     <!--
-      /activity/result/ — the directory form, for hosts that land a trailing
-      slash here and pass the id as ?r=. The path form
-      (/activity/result/<result_id>, which is what Dreambook links to) is served
-      by the root 404.html shim on static hosts. Both render the same page.
+      /activity/result/ — the bare directory form. The path form Dreambook
+      actually links to (/activity/result/<result_id>) has no file behind it on
+      a static host, so the root 404.html shim renders that one. Both show the
+      same answer key; the id in the URL isn't read.
     -->
     <main id="app"></main>
     <script src="../../quiz.js"></script>
