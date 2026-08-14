@@ -26,7 +26,7 @@
 |---|---|
 | 1 | อ่าน `?token=` จาก URL (launch JWT) |
 | 2 | verify RS256 ด้วย WebCrypto กับ `<api>/.well-known/jwks.json` (เลือกกุญแจตาม `kid`) |
-| 3 | เช็ค `iss=dreambook`, `aud=demo-activity`, `exp` (cap 900 วิ), กัน `jti` ซ้ำผ่าน localStorage |
+| 3 | เช็ค `iss=dreambook`, `aud=thailand-quiz`, `exp` (cap 900 วิ), กัน `jti` ซ้ำผ่าน localStorage |
 | 4 | `GET /activities/:id/student-context` ด้วย `report_token` → ทักชื่อเล่น + ห้อง |
 | 5 | ควิซ 3 ข้อ ตอบผิดได้ ไม่มีโทษ ตอบใหม่จนถูก |
 | 6 | ครบ 3 ข้อ → `PUT /activities/:id/progress` → backend mark completed + แจกเหรียญ |
@@ -80,7 +80,7 @@ python3 -m http.server 5175
 | `token` | — | launch JWT (บังคับ) |
 | `api` | `http://localhost:3000` | host ของ Dreambook backend — ต้องเป็น HTTPS ยกเว้น `localhost`/`127.0.0.1` (callback พก `report_token`) |
 | `iss` | `dreambook` | issuer ที่คาดหวัง |
-| `aud` | `demo-activity` | audience ที่คาดหวัง |
+| `aud` | `thailand-quiz` | audience ที่คาดหวัง — ต้องตรงกับ `config.aud` ของแถวใน `ActivityCatalog` |
 | `return` | origin ปัจจุบัน | origin ของ web app ที่จะเด้งกลับหลังจบ (ใส่ตอน dev เมื่อ activity คนละ port กับแอป เช่น `http://localhost:5173`) |
 
 ## แจ้งผลกลับแอปหลังจบกิจกรรม
@@ -123,10 +123,10 @@ https://1xkuson.github.io/demo-activity-samutfun/assets/stamp.png
 
 ## ทดสอบ end-to-end กับ backend
 
-1. seed catalog (ฝั่ง dreambook-backend) — **ยังไม่มี entry `Demo Activity` ใน
-   `prisma/activity-catalog.ts`** ต้องเพิ่มเองก่อน (guideline §2.1): `aud: 'demo-activity'`,
-   `web_url: 'http://localhost:5175'` (prod ใช้ `https://1xkuson.github.io/demo-activity-samutfun`),
-   `id: '00000000-0000-4000-a000-000000000003'`,
+1. seed catalog (ฝั่ง dreambook-backend) — entry มีแล้วใน `prisma/activity-catalog.ts`
+   ชื่อ `คำถามเกี่ยวกับประเทศไทย`: `aud: 'thailand-quiz'` (ค่านี้คือค่าที่หน้านี้เช็ค —
+   แก้ฝั่งไหนต้องแก้ให้ตรงกันทั้งคู่), `web_url: 'https://1xkuson.github.io/demo-activity-samutfun'`
+   (dev ชี้ `http://localhost:5175` ได้), `id: '00000000-0000-4000-a000-000000000003'`,
    `thumbnail_url` + `reward.image_url` ชี้ไปที่รูปในหัวข้อ [รูปกิจกรรม](#รูปกิจกรรม)
    (`reward.variant: 'yellow'` เข้ากับสีสแตมป์) แล้วค่อยรัน
    ```bash

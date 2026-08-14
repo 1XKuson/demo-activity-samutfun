@@ -46,7 +46,9 @@
       const API_IS_SECURE =
         /^https:\/\//.test(API) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(API);
       const EXPECTED_ISS = QS.get('iss') || 'dreambook';
-      const EXPECTED_AUD = QS.get('aud') || 'demo-activity';
+      // Must match config.aud of this activity's ActivityCatalog row — that is
+      // what the backend signs into the launch JWT (activity.service audFromConfig).
+      const EXPECTED_AUD = QS.get('aud') || 'thailand-quiz';
       // Opaque to Dreambook. It comes back to us in the reopen URL
       // (/activity/result/<result_id>), which serves the answer key — the same
       // page for every run, so one constant is all this needs to be.
