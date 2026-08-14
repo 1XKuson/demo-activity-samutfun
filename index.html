@@ -27,7 +27,9 @@
        *   2. verify it against <api>/.well-known/jwks.json  (WebCrypto, kid-matched)
        *   3. GET  /activities/:id/student-context  with the report_token
        *   4. PUT  /activities/:id/progress         when all 3 are right
-       *   5. redirect to <return>/?sticker=<stickerId>
+       *   5. postMessage 'activity_finished' to window.parent (§3.5), so the
+       *      Dreambook app closes the iframe and shows "ได้รับสแตมป์ใหม่".
+       *      Standalone (not iframed): fall back to <return>/?sticker=<stickerId>
        *
        * No build step and no backend of its own: serve this file statically.
        * The questions and quiz rendering live in quiz.js, shared with /demo.
@@ -39,6 +41,10 @@
       const QS = new URLSearchParams(location.search);
       // ?api= lets you point at a deployed backend without editing the file.
       const API = (QS.get('api') || 'http://localhost:3000').replace(/\/$/, '');
+      // Callbacks carry the report_token, so they go over HTTPS only (guideline
+      // §5). Plain-HTTP localhost stays allowed so a local backend still works.
+      const API_IS_SECURE =
+        /^https:\/\//.test(API) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(API);
       const EXPECTED_ISS = QS.get('iss') || 'dreambook';
       const EXPECTED_AUD = QS.get('aud') || 'demo-activity';
       const RESULT_ID = 'demo-quiz-v1'; // opaque to Dreambook; lets the app reopen this result
@@ -48,14 +54,36 @@
       // point back at a web app served from another origin/port.
       const RETURN_BASE = (QS.get('return') || '').replace(/\/+$/, '');
       const REDIRECT_DELAY_MS = 1500;
+      // Launch TTL is capped at 900s on the Dreambook side; reject anything
+      // longer-lived, whatever the token claims (guideline §4).
+      const MAX_TOKEN_TTL_SEC = 900;
+      // The app embeds us in an iframe and only learns we finished via
+      // postMessage. Outside one (dev, direct link) fall back to a redirect.
+      const EMBEDDED = window.parent !== window;
+
+      const app = document.getElementById('app');
+
+      /**
+       * Tell the host app what happened (guideline §3.5). Fire-and-forget: the
+       * callback is the authoritative channel, this only drives the app's UI.
+       * targetOrigin '*' means anyone can read it, so keep tokens and PII out.
+       */
+      const postToApp = (type, extra) => {
+        if (!EMBEDDED) return;
+        try {
+          window.parent.postMessage({ type, ...extra }, '*');
+        } catch (err) {
+          console.warn('postMessage failed:', err.message);
+        }
+      };
 
       /** Build the post-completion URL: <return>/?sticker=<stickerId>. */
       const returnUrl = (stickerId) =>
         `${RETURN_BASE}/${stickerId ? `?sticker=${encodeURIComponent(stickerId)}` : ''}`;
 
-      const app = document.getElementById('app');
-
       const fail = (msg, detail) => {
+        // The app shows this message in place of the iframe (guideline §3.5).
+        postToApp('activity_error', { message: msg });
         app.innerHTML = '';
         app.append(
           el(`<div class="group group-pad enter">
@@ -119,13 +147,23 @@
         if (!auds.includes(EXPECTED_AUD)) throw new Error(`aud=${claims.aud} ไม่ตรงกับ ${EXPECTED_AUD}`);
         const now = Math.floor(Date.now() / 1000);
         if (typeof claims.exp !== 'number' || claims.exp <= now) throw new Error('token หมดอายุแล้ว');
+        // Cap the lifetime we accept regardless of what the token asks for, so a
+        // long-lived launch token can't be sat on and replayed (guideline §4).
+        if (claims.exp - now > MAX_TOKEN_TTL_SEC) throw new Error('token อายุยาวเกินกำหนด');
         if (!claims.activity_id || !claims.report_token) throw new Error('token ไม่มี activity_id/report_token');
 
-        // Single-use: a launch token replayed from history must not start a new run.
+        // Single-use: a launch token replayed from history must not start a new
+        // run. Storage can be unavailable in a partitioned third-party iframe
+        // (Safari ITP); losing replay protection must not block the activity.
         if (claims.jti) {
           const seenKey = `demo-activity:jti:${claims.jti}`;
-          if (localStorage.getItem(seenKey)) throw new Error('token นี้ถูกใช้ไปแล้ว (เปิดกิจกรรมใหม่จากแอป)');
-          localStorage.setItem(seenKey, String(now));
+          try {
+            if (localStorage.getItem(seenKey)) throw new Error('token นี้ถูกใช้ไปแล้ว (เปิดกิจกรรมใหม่จากแอป)');
+            localStorage.setItem(seenKey, String(now));
+          } catch (err) {
+            if (err.message.startsWith('token นี้')) throw err;
+            console.warn('jti replay check unavailable:', err.message);
+          }
         }
         return claims;
       }
@@ -189,14 +227,27 @@
                   <div class="award-copy center">
                     <h2 class="title-3">กิจกรรมสำเร็จ</h2>
                     <p class="subhead">ตอบถูกครบ ${QUESTIONS.length} ข้อ${result.reward ? ' · ได้รับเหรียญแล้ว' : ''}</p>
-                    <p class="footnote">กำลังกลับไปที่ Dreambook · <a href="${esc(next)}">กลับเลย</a></p>
+                    <p class="footnote">${EMBEDDED ? 'กำลังกลับไปที่ Dreambook' : `กำลังกลับไปที่ Dreambook · <a href="${esc(next)}">กลับเลย</a>`}</p>
                   </div>
                 </div>`),
           );
-          // replace(), not assign(): the launch token is single-use, so Back must
-          // not land on a URL that now fails jti replay checks.
-          setTimeout(() => location.replace(next), REDIRECT_DELAY_MS);
+
+          // Only now that the PUT returned 2xx — announcing earlier makes the app
+          // look for a sticker the backend hasn't written yet (guideline §3.5).
+          if (EMBEDDED) {
+            postToApp('activity_finished', {
+              result_id: RESULT_ID,
+              ...(stickerId ? { sticker_code: stickerId } : {}),
+            });
+          } else {
+            // Standalone: nobody is listening, so navigate there ourselves.
+            // replace(), not assign(): the launch token is single-use, so Back
+            // must not land on a URL that now fails jti replay checks.
+            setTimeout(() => location.replace(next), REDIRECT_DELAY_MS);
+          }
         } catch (err) {
+          // Recoverable — the answers are still in hand, so offer a retry rather
+          // than posting activity_error (which tears the iframe down for good).
           card.innerHTML = '';
           card.className = 'group group-pad';
           card.append(
@@ -206,6 +257,9 @@
                   <p class="footnote" style="margin-top:14px">report_token อายุ ~3 ชม. ถ้าหมดอายุ ให้เปิดกิจกรรมใหม่จากแอป</p>
                 </div>`),
           );
+          const retry = el('<button class="btn" type="button" style="margin-top:20px">ลองส่งใหม่</button>');
+          retry.addEventListener('click', () => finish(claims, name));
+          app.append(retry);
         }
       }
 
@@ -213,6 +267,7 @@
       (async () => {
         const token = QS.get('token');
         if (!token) return fail('ไม่พบ token ใน URL', 'ต้องเปิดด้วย ?token=<launch JWT>');
+        if (!API_IS_SECURE) return fail('ปลายทาง Dreambook ไม่ปลอดภัย', `${API} ไม่ใช่ HTTPS`);
 
         let claims;
         try {

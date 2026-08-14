@@ -22,18 +22,18 @@
 |---|---|
 | 1 | อ่าน `?token=` จาก URL (launch JWT) |
 | 2 | verify RS256 ด้วย WebCrypto กับ `<api>/.well-known/jwks.json` (เลือกกุญแจตาม `kid`) |
-| 3 | เช็ค `iss=dreambook`, `aud=demo-activity`, `exp`, กัน `jti` ซ้ำผ่าน localStorage |
+| 3 | เช็ค `iss=dreambook`, `aud=demo-activity`, `exp` (cap 900 วิ), กัน `jti` ซ้ำผ่าน localStorage |
 | 4 | `GET /activities/:id/student-context` ด้วย `report_token` → ทักชื่อเล่น + ห้อง |
 | 5 | ควิซ 3 ข้อ ตอบผิดได้ ไม่มีโทษ ตอบใหม่จนถูก |
 | 6 | ครบ 3 ข้อ → `PUT /activities/:id/progress` → backend mark completed + แจกเหรียญ |
-| 7 | รายงานผลเสร็จ → เด้งกลับ `/?sticker=<stickerId>` (id จาก `reward` ที่ backend ตอบมา) |
+| 7 | PUT สำเร็จแล้วค่อย `postMessage({type:'activity_finished'})` ไปที่ `window.parent` → แอปปิด iframe เปิดหน้า "ได้รับสแตมป์ใหม่" |
 
 ### route `/demo` — โหมดทดลอง
 
 `http://localhost:5175/demo` เปิดได้เลย ไม่ต้องมี token ไม่ต้องมี backend ไม่ต้องมี CORS
 ใช้ตอนโชว์งาน รีวิวดีไซน์ หรือเปิดออฟไลน์
 
-- ตัดทิ้ง: `?token=`, verify JWT, JWKS, `student-context`, `PUT /progress`, redirect กลับแอป
+- ตัดทิ้ง: `?token=`, verify JWT, JWKS, `student-context`, `PUT /progress`, `postMessage` กลับแอป
 - เหลือ: ควิซ 3 ข้อชุดเดียวกัน (มาจาก `quiz.js`) + หน้าจบ + ปุ่ม **เล่นอีกครั้ง**
 - ไม่มีการส่งผลหรือแจกเหรียญจริง
 
@@ -53,25 +53,36 @@ python3 -m http.server 5175
 | param | default | ใช้ทำอะไร |
 |---|---|---|
 | `token` | — | launch JWT (บังคับ) |
-| `api` | `http://localhost:3000` | host ของ Dreambook backend |
+| `api` | `http://localhost:3000` | host ของ Dreambook backend — ต้องเป็น HTTPS ยกเว้น `localhost`/`127.0.0.1` (callback พก `report_token`) |
 | `iss` | `dreambook` | issuer ที่คาดหวัง |
 | `aud` | `demo-activity` | audience ที่คาดหวัง |
 | `return` | origin ปัจจุบัน | origin ของ web app ที่จะเด้งกลับหลังจบ (ใส่ตอน dev เมื่อ activity คนละ port กับแอป เช่น `http://localhost:5173`) |
 
-## เด้งกลับหลังจบกิจกรรม
+## แจ้งผลกลับแอปหลังจบกิจกรรม
 
-หลัง `PUT /activities/:id/progress` สำเร็จ หน้าจะโชว์ผล ~1.5 วิ แล้ว `location.replace()`
-ไปที่ `<return>/?sticker=<stickerId>` โดย `stickerId` มาจาก `reward.id` ใน response
-(หน้า Journal ของ web app อ่าน `?sticker=` แล้วเปิดเหรียญใบนั้น) ถ้ากิจกรรมไม่มีเหรียญ
-(`reward: null`) จะเด้งไปที่ `/` เฉย ๆ
+แอป Dreambook ฝังกิจกรรมไว้ใน **iframe** และรู้ว่าจบแล้วผ่าน `postMessage` เท่านั้น
+(`ActivityPlayer.tsx`) — redirect ข้างในไม่ถึงแอป หน้าจอจะค้าง
 
-ใช้ `replace()` ไม่ใช่ `assign()` เพราะ launch token ใช้ครั้งเดียว — กด Back กลับมา URL เดิม
-จะโดน `jti` ซ้ำปฏิเสธ
+| อยู่ที่ไหน | ทำอะไรตอนจบ |
+|---|---|
+| ใน iframe (ของจริง) | `window.parent.postMessage({ type: 'activity_finished', result_id, sticker_code }, '*')` **หลัง** `PUT /progress` ได้ 2xx |
+| เปิดตรง ๆ ไม่มี parent (dev) | โชว์ผล ~1.5 วิ แล้ว `location.replace()` ไป `<return>/?sticker=<stickerId>` |
+
+- ยิงหลัง PUT เสมอ — ยิงก่อน backend เขียนเสร็จ แอปจะหาเหรียญไม่เจอแล้วโชว์หน้าเปล่า
+- `stickerId` มาจาก `reward.id` ใน response ของ PUT ถ้ากิจกรรมไม่มีเหรียญ (`reward: null`)
+  จะไม่ส่ง `sticker_code` และ fallback จะเด้งไป `/` เฉย ๆ
+- verify token ไม่ผ่าน → `postMessage({ type: 'activity_error', message })` แอปจะโชว์ error แทน iframe
+- ส่งผลไม่สำเร็จ (PUT พัง) → **ไม่** ยิง `activity_error` เพราะยังกู้ได้ โชว์ปุ่ม **ลองส่งใหม่** แทน
+- payload ไม่มี token และไม่มี PII เพราะ targetOrigin เป็น `'*'` (ใครก็อ่านได้)
+- fallback ใช้ `replace()` ไม่ใช่ `assign()` เพราะ launch token ใช้ครั้งเดียว — กด Back
+  กลับมา URL เดิมจะโดน `jti` ซ้ำปฏิเสธ
 
 ## ทดสอบ end-to-end กับ backend
 
-1. seed catalog (ฝั่ง dreambook-backend) — entry `Demo Activity` ชี้ `web_url` มาที่
-   `http://localhost:5175`
+1. seed catalog (ฝั่ง dreambook-backend) — **ยังไม่มี entry `Demo Activity` ใน
+   `prisma/activity-catalog.ts`** ต้องเพิ่มเองก่อน (guideline §2.1): `aud: 'demo-activity'`,
+   `web_url: 'http://localhost:5175'` (prod ใช้ `https://1xkuson.github.io/demo-activity-samutfun`),
+   `id: '00000000-0000-4000-a000-000000000003'` แล้วค่อยรัน
    ```bash
    cd ../dreambook-backend && pnpm prisma db seed
    ```
