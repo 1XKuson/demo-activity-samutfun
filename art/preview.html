@@ -1,0 +1,39 @@
+<!doctype html>
+<meta charset="utf-8" />
+<style>
+  body {
+    margin: 0; padding: 24px; width: 660px; background: #f4f0df;
+    font-family: 'Noto Sans Thai', -apple-system, sans-serif; display: flex; gap: 28px; align-items: flex-start;
+  }
+  .cap { font-size: 12px; color: #544c4c; margin: 8px 0 0; }
+  /* Scan sheet: size-60 (240px), rounded-card, object-cover. */
+  .thumb { width: 240px; height: 240px; border-radius: 16px; object-fit: cover; display: block; }
+  /* StickerCard: 230x340, 4px border, colored header, art at 120px tilted. */
+  .card {
+    width: 230px; height: 340px; border: 4px solid #f5b800; border-radius: 16px;
+    background: #fffccc; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .head { background: #f5b800; min-height: 88px; display: grid; place-items: center; padding: 12px 16px; }
+  .head p { margin: 0; font-weight: 700; font-size: 17px; text-align: center; color: #222; line-height: 1.3; }
+  .body { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px 16px 20px; }
+  .date { color: #f5b800; font-weight: 500; font-size: 15px; }
+  .art { width: 120px; height: 120px; object-fit: contain; transform: rotate(4deg); }
+  .pill { border: 2px solid #222; background: #fff; border-radius: 999px; padding: 8px 24px; font-weight: 600; font-size: 15px; }
+</style>
+<body>
+  <div>
+    <img class="thumb" src="thumbnail.png" alt="" />
+    <p class="cap">ActivityScanSheet — 240px, object-cover</p>
+  </div>
+  <div>
+    <div class="card">
+      <div class="head"><p>กิจกรรม<br />คำถามชวนคิด</p></div>
+      <div class="body">
+        <span class="date">14 ส.ค. 2569</span>
+        <div style="flex:1;display:grid;place-items:center"><img class="art" src="stamp.png" alt="" /></div>
+        <div class="pill">ดูรายละเอียด</div>
+      </div>
+    </div>
+    <p class="cap">StickerCard — 120px, object-contain, tilt 4°</p>
+  </div>
+</body>

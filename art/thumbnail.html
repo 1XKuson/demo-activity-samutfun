@@ -1,0 +1,76 @@
+<!doctype html>
+<meta charset="utf-8" />
+<style>
+  /* 720x720 = 3x the 240px (size-60) the scan sheet renders it at, object-cover. */
+  html, body { margin: 0; padding: 0; }
+  body { width: 720px; height: 720px; overflow: hidden; }
+</style>
+<body>
+  <svg id="art" width="720" height="720" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!-- The app's square-paper background, redrawn so the art carries it too. -->
+      <pattern id="grid" width="12" height="12" patternUnits="userSpaceOnUse">
+        <path d="M12 0H0V12" fill="none" stroke="#222" stroke-opacity="0.09" stroke-width="0.7" />
+      </pattern>
+      <clipPath id="frame"><rect width="240" height="240" /></clipPath>
+    </defs>
+
+    <g clip-path="url(#frame)">
+      <rect width="240" height="240" fill="#fff454" />
+      <rect width="240" height="240" fill="url(#grid)" />
+
+      <!-- Oversized question marks, ink on brand yellow, sitting behind the card. -->
+      <g font-family="'SF Pro Rounded','Noto Sans Thai',-apple-system,sans-serif" font-weight="800" fill="#222">
+        <text x="199" y="64" text-anchor="middle" font-size="70" opacity="0.14">?</text>
+        <text x="30" y="176" text-anchor="middle" font-size="42" opacity="0.12">?</text>
+      </g>
+
+      <!-- Answer card, tilted like the app tilts its stickers. -->
+      <g transform="rotate(-4 120 96)">
+        <rect x="34" y="32" width="172" height="122" rx="13" fill="#222" opacity="0.16" transform="translate(2,4)" />
+        <rect x="34" y="32" width="172" height="122" rx="13" fill="#fdfdfc" stroke="#222" stroke-width="3.2" />
+
+        <!-- Progress: three questions, all done. -->
+        <g>
+          <rect x="48" y="46" width="44" height="4.6" rx="2.3" fill="#f5b800" />
+          <rect x="96" y="46" width="44" height="4.6" rx="2.3" fill="#f5b800" />
+          <rect x="144" y="46" width="44" height="4.6" rx="2.3" fill="#f5b800" />
+        </g>
+
+        <!-- Choice rows: ก ข ค — the last one answered. -->
+        <g font-family="'Noto Sans Thai','Thonburi',sans-serif" font-weight="700">
+          <g>
+            <rect x="48" y="62" width="140" height="24" rx="8" fill="#f2f2f2" />
+            <circle cx="63" cy="74" r="8.4" fill="#e4e4e4" />
+            <text x="63" y="78" text-anchor="middle" font-size="10.5" fill="#544c4c">ก</text>
+            <rect x="78" y="70.5" width="74" height="6.4" rx="3.2" fill="#d8d8d8" />
+          </g>
+          <g>
+            <rect x="48" y="91" width="140" height="24" rx="8" fill="#f2f2f2" />
+            <circle cx="63" cy="103" r="8.4" fill="#e4e4e4" />
+            <text x="63" y="107" text-anchor="middle" font-size="10.5" fill="#544c4c">ข</text>
+            <rect x="78" y="99.5" width="58" height="6.4" rx="3.2" fill="#d8d8d8" />
+          </g>
+          <g>
+            <rect x="48" y="120" width="140" height="24" rx="8" fill="#d9ffe5" stroke="#1ac57d" stroke-width="1.9" />
+            <circle cx="63" cy="132" r="8.4" fill="#1ac57d" />
+            <text x="63" y="136" text-anchor="middle" font-size="10.5" fill="#fff">ค</text>
+            <rect x="78" y="128.5" width="62" height="6.4" rx="3.2" fill="#1ac57d" opacity="0.42" />
+            <path d="M163 132l4.6 4.6 8.6-9.6" fill="none" stroke="#1ac57d" stroke-width="3.2"
+                  stroke-linecap="round" stroke-linejoin="round" />
+          </g>
+        </g>
+      </g>
+
+      <!-- Title block, clear of the card's rotated corners. -->
+      <text x="120" y="196" text-anchor="middle"
+            font-family="'Noto Sans Thai','Thonburi',sans-serif" font-size="26" font-weight="800" fill="#222">
+        คำถามชวนคิด
+      </text>
+      <text x="120" y="219" text-anchor="middle"
+            font-family="'Noto Sans Thai','Thonburi',sans-serif" font-size="13" font-weight="600" fill="#222" opacity="0.66">
+        ตอบให้ถูกครบ 3 ข้อ
+      </text>
+    </g>
+  </svg>
+</body>

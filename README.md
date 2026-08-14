@@ -18,6 +18,7 @@
 | [`quiz.js`](quiz.js) | คำถาม 3 ข้อ + render ควิซ + render เฉลย ใช้ร่วมกันทุก route |
 | [`result.js`](result.js) | bootstrap ของหน้าเฉลย |
 | [`app.css`](app.css) | สไตล์ (Apple HIG tokens) ใช้ร่วมกันทุก route |
+| [`assets/`](assets) | รูป thumbnail + สแตมป์ ของกิจกรรม (ดูหัวข้อ [รูปกิจกรรม](#รูปกิจกรรม)) |
 
 ### route `/` — flow จริง
 
@@ -101,12 +102,33 @@ python3 -m http.server 5175
 - fallback ใช้ `replace()` ไม่ใช่ `assign()` เพราะ launch token ใช้ครั้งเดียว — กด Back
   กลับมา URL เดิมจะโดน `jti` ซ้ำปฏิเสธ
 
+## รูปกิจกรรม
+
+PNG 2 ใบ เสิร์ฟจาก Pages ตรง ๆ เอา URL ไปใส่ catalog seed ได้เลย
+
+| ไฟล์ | ขนาด | ใส่ที่ field | แอป render ยังไง |
+|---|---|---|---|
+| [`assets/thumbnail.png`](assets/thumbnail.png) | 720×720 (3× ของ 240) | `thumbnail_url` | `ActivityScanSheet` — `size-60` + `object-cover` + `rounded-card` |
+| [`assets/stamp.png`](assets/stamp.png) | 360×360 **โปร่งใส** (3× ของ 120) | `reward.image_url` | `StickerCard` — `size-[120px]` + `object-contain` + เอียง 4° บนพื้นการ์ดสีอ่อน |
+
+```
+https://1xkuson.github.io/demo-activity-samutfun/assets/thumbnail.png
+https://1xkuson.github.io/demo-activity-samutfun/assets/stamp.png
+```
+
+- สแตมป์ต้อง**พื้นหลังโปร่งใส** เพราะการ์ดมีสีพื้นของตัวเอง (`highlight-*-100`) — ใบนี้เป็น RGBA แล้ว
+- ทรงหกเหลี่ยมล้อ placeholder ใน `StickerCard.tsx` (polygon เดียวกัน) การ์ดที่มีรูปกับไม่มีรูปจะได้อยู่ตระกูลเดียวกัน
+- สีล้อ token ของแอป: brand `#fff454`, ink `#222`, secondary-yellow `#c98a00`, green `#1ac57d`
+- ต้นฉบับเป็น SVG ใน `art/` — แก้แล้ว render ใหม่ด้วย headless Chrome (ดู `art/README.md`)
+
 ## ทดสอบ end-to-end กับ backend
 
 1. seed catalog (ฝั่ง dreambook-backend) — **ยังไม่มี entry `Demo Activity` ใน
    `prisma/activity-catalog.ts`** ต้องเพิ่มเองก่อน (guideline §2.1): `aud: 'demo-activity'`,
    `web_url: 'http://localhost:5175'` (prod ใช้ `https://1xkuson.github.io/demo-activity-samutfun`),
-   `id: '00000000-0000-4000-a000-000000000003'` แล้วค่อยรัน
+   `id: '00000000-0000-4000-a000-000000000003'`,
+   `thumbnail_url` + `reward.image_url` ชี้ไปที่รูปในหัวข้อ [รูปกิจกรรม](#รูปกิจกรรม)
+   (`reward.variant: 'yellow'` เข้ากับสีสแตมป์) แล้วค่อยรัน
    ```bash
    cd ../dreambook-backend && pnpm prisma db seed
    ```
