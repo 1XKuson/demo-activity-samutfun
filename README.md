@@ -72,13 +72,17 @@ python3 -m http.server 5175
 # หรือ: npx serve -l 5175 .
 ```
 
-ค่า default ชี้ backend ที่ `http://localhost:3000` — เปลี่ยนได้ด้วย query param
-โดยไม่ต้องแก้ไฟล์:
+backend ที่หน้านี้ยิงไปหา มาจาก `config.js` (`window.APP_CONFIG.api`) — ตอนนี้ตั้งเป็น
+`https://api-dev.samutfun.org` เปลี่ยน environment = แก้ไฟล์นี้ไฟล์เดียวแล้ว push
+(หน้านี้เป็น static ไม่มี build step `.env` จึงไปไม่ถึง browser) ไม่มี `config.js`
+หรือลบทิ้ง → ตกกลับไป `http://localhost:3000`
+
+ทับได้ด้วย query param โดยไม่ต้องแก้ไฟล์:
 
 | param | default | ใช้ทำอะไร |
 |---|---|---|
 | `token` | — | launch JWT (บังคับ) |
-| `api` | `http://localhost:3000` | host ของ Dreambook backend — ต้องเป็น HTTPS ยกเว้น `localhost`/`127.0.0.1` (callback พก `report_token`) |
+| `api` | `config.js` → `http://localhost:3000` | host ของ Dreambook backend — ต้องเป็น HTTPS ยกเว้น `localhost`/`127.0.0.1` (callback พก `report_token`) |
 | `iss` | `dreambook` | issuer ที่คาดหวัง |
 | `aud` | `thailand-quiz` | audience ที่คาดหวัง — ต้องตรงกับ `config.aud` ของแถวใน `ActivityCatalog` |
 | `return` | origin ปัจจุบัน | origin ของ web app ที่จะเด้งกลับหลังจบ (ใส่ตอน dev เมื่อ activity คนละ port กับแอป เช่น `http://localhost:5173`) |

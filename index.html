@@ -16,6 +16,7 @@
       </div>
     </main>
 
+    <script src="config.js"></script>
     <script src="quiz.js"></script>
     <script>
       /**
@@ -39,8 +40,12 @@
 
       // ---------- config ----------
       const QS = new URLSearchParams(location.search);
-      // ?api= lets you point at a deployed backend without editing the file.
-      const API = (QS.get('api') || 'http://localhost:3000').replace(/\/$/, '');
+      // Where the backend lives: ?api= (debugging) beats config.js (the deployed
+      // default, see that file) beats localhost (a bare `git clone`).
+      const API = (QS.get('api') || window.APP_CONFIG?.api || 'http://localhost:3000').replace(
+        /\/$/,
+        '',
+      );
       // Callbacks carry the report_token, so they go over HTTPS only (guideline
       // §5). Plain-HTTP localhost stays allowed so a local backend still works.
       const API_IS_SECURE =
