@@ -11,5 +11,5 @@
  * No secrets here: it ships to every visitor. An origin is public by nature.
  */
 window.APP_CONFIG = {
-  api: 'https://api-dev.samutfun.org',
+  api: 'https://api.samutfun.org',
 };

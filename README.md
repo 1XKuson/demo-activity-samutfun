@@ -47,11 +47,14 @@
   ให้ (GitHub Pages เสิร์ฟ `404.html` ให้ path ที่ไม่มีไฟล์) ส่วน
   `activity/result/index.html` รับเคสเปิดที่ path เปล่า ๆ
 
-> **ข้อควรระวังตอน deploy:** backend ใช้ `new URL(web_url).origin` — **ตัด path ทิ้ง**
-> ฉะนั้นถ้า activity อยู่ใต้ path ย่อย (เช่น GitHub Pages project page
-> `…github.io/demo-activity-samutfun/`) ลิงก์ผลลัพธ์จะกลายเป็น `…github.io/activity/result/<id>`
-> ซึ่งไม่ใช่ของเรา หน้าผลลัพธ์จะเปิดไม่ได้ — ต้อง deploy ที่ root ของโดเมน/ซับโดเมน
-> (แบบ `goalsetting-dev.samutfun.org`) ถึงจะครบ loop
+URL ประกาศตรง ๆ ใน catalog ที่ `config.result_url` แล้ว backend เอา `result_id` ไปต่อท้าย
+(`resultUrlFor` ใน `activity-config.ts`) — ไม่ได้ derive จาก `web_url` อยู่ใต้ path ย่อย
+แบบ GitHub Pages project page จึงใช้ได้:
+
+```
+result_url  https://1xkuson.github.io/demo-activity-samutfun/activity/result
++ result_id /demo-quiz-v1
+```
 
 ### route `/demo` — โหมดทดลอง
 
@@ -73,7 +76,7 @@ python3 -m http.server 5175
 ```
 
 backend ที่หน้านี้ยิงไปหา มาจาก `config.js` (`window.APP_CONFIG.api`) — ตอนนี้ตั้งเป็น
-`https://api-dev.samutfun.org` เปลี่ยน environment = แก้ไฟล์นี้ไฟล์เดียวแล้ว push
+`https://api.samutfun.org` เปลี่ยน environment = แก้ไฟล์นี้ไฟล์เดียวแล้ว push
 (หน้านี้เป็น static ไม่มี build step `.env` จึงไปไม่ถึง browser) ไม่มี `config.js`
 หรือลบทิ้ง → ตกกลับไป `http://localhost:3000`
 
@@ -108,7 +111,9 @@ backend ที่หน้านี้ยิงไปหา มาจาก `con
 
 ## รูปกิจกรรม
 
-PNG 2 ใบ เสิร์ฟจาก Pages ตรง ๆ เอา URL ไปใส่ catalog seed ได้เลย
+PNG 2 ใบ เสิร์ฟจาก Pages ตรง ๆ (catalog ตอนนี้ชี้ไปที่สำเนาบน GCS —
+`preview_card/thai_quize_thumbnail.png`, `sticker/thai_quize_stamp.png`
+แก้รูปที่นี่แล้วอย่าลืมอัปทับบน GCS ด้วย)
 
 | ไฟล์ | ขนาด | ใส่ที่ field | แอป render ยังไง |
 |---|---|---|---|
@@ -131,8 +136,9 @@ https://1xkuson.github.io/demo-activity-samutfun/assets/stamp.png
    ชื่อ `คำถามเกี่ยวกับประเทศไทย`: `aud: 'thailand-quiz'` (ค่านี้คือค่าที่หน้านี้เช็ค —
    แก้ฝั่งไหนต้องแก้ให้ตรงกันทั้งคู่), `web_url: 'https://1xkuson.github.io/demo-activity-samutfun'`
    (dev ชี้ `http://localhost:5175` ได้), `id: '00000000-0000-4000-a000-000000000003'`,
-   `thumbnail_url` + `reward.image_url` ชี้ไปที่รูปในหัวข้อ [รูปกิจกรรม](#รูปกิจกรรม)
-   (`reward.variant: 'yellow'` เข้ากับสีสแตมป์) แล้วค่อยรัน
+   `result_url: 'https://1xkuson.github.io/demo-activity-samutfun/activity/result'`,
+   `thumbnail_url` + `reward.image_url` = สำเนาบน GCS ของรูปในหัวข้อ [รูปกิจกรรม](#รูปกิจกรรม)
+   แล้วค่อยรัน
    ```bash
    cd ../dreambook-backend && pnpm prisma db seed
    ```
