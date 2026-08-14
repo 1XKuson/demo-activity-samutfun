@@ -13,8 +13,11 @@
 |---|---|
 | [`index.html`](index.html) | route `/` — กิจกรรมจริง (verify launch JWT + callback กลับ Dreambook) |
 | [`demo/index.html`](demo/index.html) | route `/demo` — กิจกรรมเดียวกันแบบไม่ต่อ backend |
-| [`quiz.js`](quiz.js) | คำถาม 3 ข้อ + การ render ควิซ ใช้ร่วมกันทั้งสอง route |
-| [`app.css`](app.css) | สไตล์ (Apple HIG tokens) ใช้ร่วมกันทั้งสอง route |
+| [`activity/result/index.html`](activity/result/index.html) | route `/activity/result/<result_id>` — หน้าผลลัพธ์ เปิดย้อนหลังจากสแตมป์ |
+| [`404.html`](404.html) | shim ให้ static host เสิร์ฟ path `/activity/result/<result_id>` ได้ |
+| [`quiz.js`](quiz.js) | คำถาม 3 ข้อ + render ควิซ + render หน้าทบทวนคำตอบ + encode/decode run |
+| [`result.js`](result.js) | bootstrap ของหน้าผลลัพธ์ (อ่าน `result_id` → วาดคำตอบ) |
+| [`app.css`](app.css) | สไตล์ (Apple HIG tokens) ใช้ร่วมกันทุก route |
 
 ### route `/` — flow จริง
 
@@ -25,8 +28,38 @@
 | 3 | เช็ค `iss=dreambook`, `aud=demo-activity`, `exp` (cap 900 วิ), กัน `jti` ซ้ำผ่าน localStorage |
 | 4 | `GET /activities/:id/student-context` ด้วย `report_token` → ทักชื่อเล่น + ห้อง |
 | 5 | ควิซ 3 ข้อ ตอบผิดได้ ไม่มีโทษ ตอบใหม่จนถูก |
-| 6 | ครบ 3 ข้อ → `PUT /activities/:id/progress` → backend mark completed + แจกเหรียญ |
+| 6 | ครบ 3 ข้อ → `PUT /activities/:id/progress` พร้อม `result_id` ที่ encode run ไว้ → backend mark completed + แจกเหรียญ |
 | 7 | PUT สำเร็จแล้วค่อย `postMessage({type:'activity_finished'})` ไปที่ `window.parent` → แอปปิด iframe เปิดหน้า "ได้รับสแตมป์ใหม่" |
+| 8 | เปิดสแตมป์ในสมุดบันทึกทีหลัง → แอป iframe `/activity/result/<result_id>` → เห็นคำตอบทุกข้อ |
+
+### route `/activity/result/<result_id>` — หน้าผลลัพธ์
+
+แอปเปิดหน้านี้ใน iframe ตอนกดสแตมป์ในสมุดบันทึก (`ActivityResultView.tsx`) — **เปิดเย็น ๆ
+ไม่มี token ไม่มี session ไม่มี callback** URL สร้างจาก backend เป็น
+`<origin ของ web_url>/activity/result/<result_id>` (ดู `sticker.service.ts`)
+
+กิจกรรมนี้ไม่มี backend เป็นของตัวเอง เลยไม่มีที่เก็บคำตอบ — จึง **encode run ลงใน
+`result_id`** ไปเลย แล้วหน้าผลลัพธ์ decode กลับมาวาดใหม่
+
+| ส่วน | ความหมาย |
+|---|---|
+| `v1.` | เวอร์ชันของ format |
+| ตัวถัดไป (1 ตัว/ข้อ) | hex bitmask ของตัวเลือกที่กด — bit 0 = ก, bit 1 = ข, … |
+
+ตัวอย่าง `v1.432` = ข้อ 1 กด `ค` (ถูกครั้งแรก), ข้อ 2 กด `ข` แล้ว `ก`, ข้อ 3 กด `ข`
+เอา popcount − 1 ก็ได้จำนวนครั้งที่ตอบผิดของข้อนั้น
+
+- `result_id` ที่ decode ไม่ได้ (คนละ format / คำถามเปลี่ยนชุดไปแล้ว) → โชว์
+  "ยังไม่มีรายละเอียดผลลัพธ์" ไม่เดาคำตอบมั่ว
+- static host ไม่มีไฟล์ตรง path ที่มี segment ท้าย — `404.html` เลยรับหน้าที่ render
+  ให้ (GitHub Pages เสิร์ฟ `404.html` ให้ path ที่ไม่มีไฟล์) ส่วน
+  `activity/result/index.html` รองรับรูปแบบ `?r=<result_id>`
+
+> **ข้อควรระวังตอน deploy:** backend ใช้ `new URL(web_url).origin` — **ตัด path ทิ้ง**
+> ฉะนั้นถ้า activity อยู่ใต้ path ย่อย (เช่น GitHub Pages project page
+> `…github.io/demo-activity-samutfun/`) ลิงก์ผลลัพธ์จะกลายเป็น `…github.io/activity/result/<id>`
+> ซึ่งไม่ใช่ของเรา หน้าผลลัพธ์จะเปิดไม่ได้ — ต้อง deploy ที่ root ของโดเมน/ซับโดเมน
+> (แบบ `goalsetting-dev.samutfun.org`) ถึงจะครบ loop
 
 ### route `/demo` — โหมดทดลอง
 
@@ -34,7 +67,8 @@
 ใช้ตอนโชว์งาน รีวิวดีไซน์ หรือเปิดออฟไลน์
 
 - ตัดทิ้ง: `?token=`, verify JWT, JWKS, `student-context`, `PUT /progress`, `postMessage` กลับแอป
-- เหลือ: ควิซ 3 ข้อชุดเดียวกัน (มาจาก `quiz.js`) + หน้าจบ + ปุ่ม **เล่นอีกครั้ง**
+- เหลือ: ควิซ 3 ข้อชุดเดียวกัน (มาจาก `quiz.js`) + หน้าจบ + **ทบทวนคำตอบ** + ปุ่ม **เล่นอีกครั้ง**
+- มีลิงก์ไปหน้าผลลัพธ์ของรอบที่เพิ่งเล่น (`../activity/result/?r=<result_id>`) ไว้ลองของ
 - ไม่มีการส่งผลหรือแจกเหรียญจริง
 
 คำถามและหน้าตาควิซอยู่ใน `quiz.js` ไฟล์เดียว ทั้งสอง route จึงไม่มีทางเพี้ยนจากกัน
@@ -66,7 +100,7 @@ python3 -m http.server 5175
 | อยู่ที่ไหน | ทำอะไรตอนจบ |
 |---|---|
 | ใน iframe (ของจริง) | `window.parent.postMessage({ type: 'activity_finished', result_id, sticker_code }, '*')` **หลัง** `PUT /progress` ได้ 2xx |
-| เปิดตรง ๆ ไม่มี parent (dev) | โชว์ผล ~1.5 วิ แล้ว `location.replace()` ไป `<return>/?sticker=<stickerId>` |
+| เปิดตรง ๆ ไม่มี parent (dev) | โชว์ผล + ทบทวนคำตอบ ค้างไว้ให้อ่าน มีปุ่มกลับไป `<return>/?sticker=<stickerId>` (ไม่เด้งเอง) |
 
 - ยิงหลัง PUT เสมอ — ยิงก่อน backend เขียนเสร็จ แอปจะหาเหรียญไม่เจอแล้วโชว์หน้าเปล่า
 - `stickerId` มาจาก `reward.id` ใน response ของ PUT ถ้ากิจกรรมไม่มีเหรียญ (`reward: null`)

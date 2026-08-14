@@ -205,6 +205,35 @@ a:hover { text-decoration: underline; }
 }
 .award-copy { padding: 12px 20px 20px; display: grid; gap: 6px; }
 
+/* ---------- answer review (result page + demo) ---------- */
+.review-head {
+  padding: 16px 20px;
+  border-bottom: 0.5px solid var(--separator);
+  display: grid;
+  gap: 2px;
+}
+.review-item + .review-item { border-top: 0.5px solid var(--separator); }
+.review-q { padding: 16px 20px 10px; display: grid; gap: 4px; }
+/* Review rows are static: no hover, no press, no pointer. */
+.review .row { cursor: default; }
+.review .row:hover { background: transparent; }
+.review .row[data-state="right"]:hover { background: var(--blue-tint); }
+.review .row[data-state="wrong"]:hover { background: var(--red-tint); }
+.review .row[data-state="wrong"] { animation: none; }
+.review .mark:empty { opacity: 0; }
+
+.first-tag,
+.retry-tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: 8px;
+}
+.first-tag { color: var(--blue); background: var(--blue-tint); }
+.retry-tag { color: var(--red); background: var(--red-tint); }
+
 /* ---------- states ---------- */
 .spinner {
   width: 20px;

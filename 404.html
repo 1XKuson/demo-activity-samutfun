@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <meta name="robots" content="noindex" />
+    <title>ผลกิจกรรม — คำถามชวนคิด</title>
+  </head>
+  <body>
+    <main id="app"></main>
+    <script>
+      /**
+       * Dreambook links results at `<origin>/activity/result/<result_id>` — a
+       * path segment no static host has a file for. GitHub Pages serves this
+       * 404.html for it, so this is where the result page actually gets rendered
+       * in a static deploy.
+       *
+       * Assets can't be linked with plain relative URLs here: the browser
+       * resolves them against the requested path, not against 404.html. So
+       * derive the site root from the URL and inject them.
+       */
+      (function () {
+        const MARKER = '/activity/result/';
+        const at = location.pathname.indexOf(MARKER);
+        const app = document.getElementById('app');
+
+        if (at < 0) {
+          document.title = 'ไม่พบหน้านี้';
+          app.innerHTML =
+            '<div style="font:17px/1.5 -apple-system,BlinkMacSystemFont,\'Noto Sans Thai\',sans-serif;padding:24px">ไม่พบหน้านี้</div>';
+          return;
+        }
+
+        // Everything before /activity/result/ is the site root — works the same
+        // at a domain root and under a GitHub Pages project path.
+        const base = location.pathname.slice(0, at + 1);
+
+        const css = document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = base + 'app.css';
+        document.head.append(css);
+
+        // async=false keeps quiz.js ahead of result.js, which depends on it.
+        for (const src of ['quiz.js', 'result.js']) {
+          const s = document.createElement('script');
+          s.src = base + src;
+          s.async = false;
+          document.body.append(s);
+        }
+      })();
+    </script>
+  </body>
+</html>

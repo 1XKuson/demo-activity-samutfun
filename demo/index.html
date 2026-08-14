@@ -25,7 +25,7 @@
        * a real student sees. Only the bookends differ.
        */
 
-      const { QUESTIONS, AWARD_SVG, el, renderQuiz } = QuizKit;
+      const { QUESTIONS, AWARD_SVG, el, esc, renderQuiz, renderReview, encodeRun } = QuizKit;
 
       const app = document.getElementById('app');
       const DEMO_NAME = 'เพื่อนนักทดลอง';
@@ -40,7 +40,7 @@
         });
       }
 
-      function showAward() {
+      function showAward(run) {
         app.innerHTML = '';
         app.append(
           el(`<header class="header enter">
@@ -58,8 +58,17 @@
               </div>
             </section>`);
         app.append(card);
+        renderReview(app, run);
 
-        const again = el('<button class="btn" type="button" style="margin-top:20px">เล่นอีกครั้ง</button>');
+        // The result page reads the run out of the id, so the demo can link
+        // straight at it — the same page the app iframes from a sticker.
+        const resultId = encodeRun(run);
+        app.append(
+          el(`<p class="footnote center" style="margin-top:20px">หน้าผลลัพธ์แบบเปิดย้อนหลัง:
+                <a href="../activity/result/?r=${esc(encodeURIComponent(resultId))}">${esc(resultId)}</a></p>`),
+        );
+
+        const again = el('<button class="btn" type="button" style="margin-top:16px">เล่นอีกครั้ง</button>');
         again.addEventListener('click', start);
         app.append(again);
       }
