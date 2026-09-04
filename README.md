@@ -75,20 +75,50 @@ python3 -m http.server 5175
 # หรือ: npx serve -l 5175 .
 ```
 
-backend ที่หน้านี้ยิงไปหา มาจาก `config.js` (`window.APP_CONFIG.api`) — ตอนนี้ตั้งเป็น
-`https://api.samutfun.org` เปลี่ยน environment = แก้ไฟล์นี้ไฟล์เดียวแล้ว push
-(หน้านี้เป็น static ไม่มี build step `.env` จึงไปไม่ถึง browser) ไม่มี `config.js`
-หรือลบทิ้ง → ตกกลับไป `http://localhost:3000`
+backend ที่หน้านี้ยิงไปหา มาจาก `config.js` (`window.APP_CONFIG.api`) ซึ่งเลือกให้เอง
+**จาก path ที่ถูกเสิร์ฟ** (ดูหัวข้อ [environment](#environment)) — เปิดจากที่อื่น เช่น
+`python3 -m http.server` หรือ fork จะได้ prod (หน้านี้เป็น static ไม่มี build step
+`.env` จึงไปไม่ถึง browser)
 
 ทับได้ด้วย query param โดยไม่ต้องแก้ไฟล์:
 
 | param | default | ใช้ทำอะไร |
 |---|---|---|
 | `token` | — | launch JWT (บังคับ) |
-| `api` | `config.js` → `http://localhost:3000` | host ของ Dreambook backend — ต้องเป็น HTTPS ยกเว้น `localhost`/`127.0.0.1` (callback พก `report_token`) |
+| `api` | `config.js` (prod/dev ตาม path) | host ของ Dreambook backend — ต้องเป็น HTTPS ยกเว้น `localhost`/`127.0.0.1` (callback พก `report_token`) |
 | `iss` | `dreambook` | issuer ที่คาดหวัง |
 | `aud` | `thailand-quiz` | audience ที่คาดหวัง — ต้องตรงกับ `config.aud` ของแถวใน `ActivityCatalog` |
 | `return` | origin ปัจจุบัน | origin ของ web app ที่จะเด้งกลับหลังจบ (ใส่ตอน dev เมื่อ activity คนละ port กับแอป เช่น `http://localhost:5173`) |
+
+## environment
+
+**2 env อยู่บน GitHub Pages site เดียวกัน คนละ path** — deploy ด้วย
+[`.github/workflows/pages.yml`](.github/workflows/pages.yml) ที่ checkout ทั้งสอง branch
+แล้วอัปเป็น artifact เดียว (Pages ทับทั้ง site ทุกครั้งที่ deploy — push branch ไหน
+ก็ build ใหม่ทั้งคู่)
+
+| env | branch | path | backend |
+|---|---|---|---|
+| prod | `main` | `https://1xkuson.github.io/demo-activity-samutfun/` | `https://api.samutfun.org` |
+| dev | `dev` | `https://1xkuson.github.io/demo-activity-samutfun/dev/` | `https://api-dev.samutfun.org` |
+
+`config.js` เป็นไฟล์เดียวกันทั้งสอง branch — เลือก backend ตอน runtime จาก path
+(`/dev/` → dev, ที่เหลือ → prod) **ไม่ใช่** hardcode คนละค่าคนละ branch เพราะแบบนั้น
+merge `dev` → `main` เมื่อไหร่ prod จะโดน backend dev ลากไปด้วย
+
+ค่าที่ต้อง seed ลง `ActivityCatalog` ของ backend แต่ละตัว (backend คนละตัว = คนละแถว):
+
+| field | prod | dev |
+|---|---|---|
+| `web_url` | `https://1xkuson.github.io/demo-activity-samutfun` | `https://1xkuson.github.io/demo-activity-samutfun/dev` |
+| `result_url` | `https://1xkuson.github.io/demo-activity-samutfun/activity/result` | `https://1xkuson.github.io/demo-activity-samutfun/dev/activity/result` |
+
+หน้าเฉลยใต้ `/dev/` ใช้ `404.html` ใบเดียวกับ prod ได้ เพราะมัน derive site root จาก
+ตำแหน่งของ `/activity/result/` ใน path ไม่ได้ fix ว่าอยู่ที่ราก
+
+ปล่อยของ: push `dev` → เห็นที่ `/dev/` ก่อน, พอชัวร์แล้ว merge เข้า `main` → ขึ้น prod
+(ถ้าอยากให้ dev ตามโค้ด prod ไปก่อน ก็ merge `main` → `dev` ได้ตามปกติ ไฟล์ config
+ไม่ต่างกัน)
 
 ## แจ้งผลกลับแอปหลังจบกิจกรรม
 
@@ -134,9 +164,9 @@ https://1xkuson.github.io/demo-activity-samutfun/assets/stamp.png
 
 1. seed catalog (ฝั่ง dreambook-backend) — entry มีแล้วใน `prisma/activity-catalog.ts`
    ชื่อ `คำถามเกี่ยวกับประเทศไทย`: `aud: 'thailand-quiz'` (ค่านี้คือค่าที่หน้านี้เช็ค —
-   แก้ฝั่งไหนต้องแก้ให้ตรงกันทั้งคู่), `web_url: 'https://1xkuson.github.io/demo-activity-samutfun'`
-   (dev ชี้ `http://localhost:5175` ได้), `id: '00000000-0000-4000-a000-000000000003'`,
-   `result_url: 'https://1xkuson.github.io/demo-activity-samutfun/activity/result'`,
+   แก้ฝั่งไหนต้องแก้ให้ตรงกันทั้งคู่), `web_url` + `result_url` ตามตารางใน
+   [environment](#environment) (backend dev ใช้แถวคอลัมน์ dev, ตอน dev เครื่องตัวเอง
+   ชี้ `http://localhost:5175` ได้), `id: '00000000-0000-4000-a000-000000000003'`,
    `thumbnail_url` + `reward.image_url` = สำเนาบน GCS ของรูปในหัวข้อ [รูปกิจกรรม](#รูปกิจกรรม)
    แล้วค่อยรัน
    ```bash

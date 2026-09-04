@@ -1,0 +1,57 @@
+# Publishes both environments of this static site in one GitHub Pages deploy.
+#
+#   prod  main branch -> /       -> api.samutfun.org
+#   dev   dev branch  -> /dev/   -> api-dev.samutfun.org
+#
+# Pages replaces the whole site on every deploy, so a push to either branch has
+# to rebuild both halves — hence the two checkouts. Which backend a copy talks
+# to is decided at runtime from its path (see config.js), so the two trees are
+# published verbatim with nothing patched in.
+name: Deploy Pages
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race for the one site; the newer push wins.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      # main first: checkout wipes its target directory, and _site/dev has to
+      # survive that, so it can only be filled afterwards.
+      - name: Check out main (prod, site root)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: _site
+
+      - name: Check out dev (dev, /dev/)
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          path: _site/dev
+
+      # Both checkouts leave a .git behind, which has no business being served.
+      - name: Drop the git metadata
+        run: rm -rf _site/.git _site/dev/.git
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
