@@ -1,0 +1,666 @@
+/**
+ * Sakura Garden — pixel-farm skin (Stardew Valley direction).
+ *
+ * Everything sits on a 4px pixel grid (`--u`): square frames, hard offset
+ * shadows in soil brown, no border-radius, no blur, no soft rgba shadows.
+ * Sprites are inline SVGs of 1px rects generated from ASCII grids
+ * (scratchpad/sprites.py); the tree art is pre-baked pixel art in
+ * assets/sakura/pixel and scaled up with image-rendering: pixelated.
+ *
+ * Type: Mitr carries Thai (loopless, chunky, reads as game UI); Silkscreen is
+ * a true bitmap face and is used only where the content is numeric, so it
+ * never has to fall back for Thai.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Mitr:wght@300;400;500;600&family=Silkscreen:wght@400;700&display=swap');
+
+:root {
+  --u: 4px;
+  --u2: 2px;    /* half-pixel drop for text below 17px, where 4px doubles up */
+
+  --soil: #3b2412;
+  --soil-lo: #26150a;
+  --plank: #8b5a2b;
+  --plank-hi: #a9723c;
+  --plank-lo: #6b4220;
+  --parch: #f4ddb0;
+  --parch-hi: #fff0cd;
+  --parch-lo: #ddbe86;
+  --parch-sink: #c9a76e;
+  --cream: #fff6e0;
+  --grass: #6fa644;
+  --grass-lo: #4f7c30;
+  --leaf: #9bd35f;
+  --bloom: #e8749a;
+  --bloom-lo: #c4506f;
+  --coin: #f1c232;
+  --sky: #8fd0f0;
+  --muted: #6b4a2d;
+
+  --px-coin: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'><path d='M2 0h4v1h-4z' fill='%233B2412'/><path d='M1 1h1v1h-1z' fill='%233B2412'/><path d='M2 1h4v1h-4z' fill='%23F1C232'/><path d='M6 1h1v1h-1z' fill='%233B2412'/><path d='M0 2h1v1h-1z' fill='%233B2412'/><path d='M1 2h1v1h-1z' fill='%23F1C232'/><path d='M2 2h1v1h-1z' fill='%23ffd1de'/><path d='M3 2h2v1h-2z' fill='%23F1C232'/><path d='M5 2h1v1h-1z' fill='%23C08A1E'/><path d='M6 2h1v1h-1z' fill='%23F1C232'/><path d='M7 2h1v1h-1z' fill='%233B2412'/><path d='M0 3h1v1h-1z' fill='%233B2412'/><path d='M1 3h1v1h-1z' fill='%23F1C232'/><path d='M2 3h1v1h-1z' fill='%23ffd1de'/><path d='M3 3h2v1h-2z' fill='%23F1C232'/><path d='M5 3h1v1h-1z' fill='%23C08A1E'/><path d='M6 3h1v1h-1z' fill='%23F1C232'/><path d='M7 3h1v1h-1z' fill='%233B2412'/><path d='M0 4h1v1h-1z' fill='%233B2412'/><path d='M1 4h1v1h-1z' fill='%23F1C232'/><path d='M2 4h1v1h-1z' fill='%23ffd1de'/><path d='M3 4h2v1h-2z' fill='%23F1C232'/><path d='M5 4h1v1h-1z' fill='%23C08A1E'/><path d='M6 4h1v1h-1z' fill='%23F1C232'/><path d='M7 4h1v1h-1z' fill='%233B2412'/><path d='M0 5h1v1h-1z' fill='%233B2412'/><path d='M1 5h4v1h-4z' fill='%23F1C232'/><path d='M5 5h1v1h-1z' fill='%23C08A1E'/><path d='M6 5h1v1h-1z' fill='%23F1C232'/><path d='M7 5h1v1h-1z' fill='%233B2412'/><path d='M1 6h1v1h-1z' fill='%233B2412'/><path d='M2 6h4v1h-4z' fill='%23C08A1E'/><path d='M6 6h1v1h-1z' fill='%233B2412'/><path d='M2 7h4v1h-4z' fill='%233B2412'/></svg>");
+  --px-water: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'><path d='M3 0h2v1h-2z' fill='%231F4E73'/><path d='M2 1h1v1h-1z' fill='%231F4E73'/><path d='M3 1h2v1h-2z' fill='%235AA9E0'/><path d='M5 1h1v1h-1z' fill='%231F4E73'/><path d='M1 2h1v1h-1z' fill='%231F4E73'/><path d='M2 2h1v1h-1z' fill='%235AA9E0'/><path d='M3 2h1v1h-1z' fill='%23BFE6FF'/><path d='M4 2h2v1h-2z' fill='%235AA9E0'/><path d='M6 2h1v1h-1z' fill='%231F4E73'/><path d='M0 3h1v1h-1z' fill='%231F4E73'/><path d='M1 3h1v1h-1z' fill='%235AA9E0'/><path d='M2 3h1v1h-1z' fill='%23BFE6FF'/><path d='M3 3h4v1h-4z' fill='%235AA9E0'/><path d='M7 3h1v1h-1z' fill='%231F4E73'/><path d='M0 4h1v1h-1z' fill='%231F4E73'/><path d='M1 4h1v1h-1z' fill='%235AA9E0'/><path d='M2 4h1v1h-1z' fill='%23BFE6FF'/><path d='M3 4h4v1h-4z' fill='%235AA9E0'/><path d='M7 4h1v1h-1z' fill='%231F4E73'/><path d='M0 5h1v1h-1z' fill='%231F4E73'/><path d='M1 5h6v1h-6z' fill='%235AA9E0'/><path d='M7 5h1v1h-1z' fill='%231F4E73'/><path d='M1 6h1v1h-1z' fill='%231F4E73'/><path d='M2 6h4v1h-4z' fill='%235AA9E0'/><path d='M6 6h1v1h-1z' fill='%231F4E73'/><path d='M2 7h4v1h-4z' fill='%231F4E73'/></svg>");
+  --px-sprout: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'><path d='M3 0h2v1h-2z' fill='%232A3D18'/><path d='M2 1h1v1h-1z' fill='%232A3D18'/><path d='M3 1h1v1h-1z' fill='%239BD35F'/><path d='M4 1h1v1h-1z' fill='%236FA644'/><path d='M5 1h1v1h-1z' fill='%232A3D18'/><path d='M7 1h1v1h-1z' fill='%232A3D18'/><path d='M1 2h1v1h-1z' fill='%232A3D18'/><path d='M2 2h1v1h-1z' fill='%239BD35F'/><path d='M3 2h2v1h-2z' fill='%236FA644'/><path d='M5 2h1v1h-1z' fill='%232A3D18'/><path d='M6 2h1v1h-1z' fill='%236FA644'/><path d='M7 2h1v1h-1z' fill='%232A3D18'/><path d='M0 3h1v1h-1z' fill='%232A3D18'/><path d='M1 3h1v1h-1z' fill='%239BD35F'/><path d='M2 3h4v1h-4z' fill='%236FA644'/><path d='M6 3h2v1h-2z' fill='%232A3D18'/><path d='M3 4h1v1h-1z' fill='%232A3D18'/><path d='M4 4h1v1h-1z' fill='%234E7A2E'/><path d='M5 4h1v1h-1z' fill='%232A3D18'/><path d='M3 5h1v1h-1z' fill='%232A3D18'/><path d='M4 5h1v1h-1z' fill='%234E7A2E'/><path d='M5 5h1v1h-1z' fill='%232A3D18'/><path d='M1 6h1v1h-1z' fill='%234A2E15'/><path d='M2 6h4v1h-4z' fill='%237A5230'/><path d='M6 6h1v1h-1z' fill='%234A2E15'/><path d='M1 7h6v1h-6z' fill='%234A2E15'/></svg>");
+  --px-petal: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 6' shape-rendering='crispEdges'><path d='M2 0h2v1h-2z' fill='%239e3350'/><path d='M1 1h1v1h-1z' fill='%239e3350'/><path d='M2 1h2v1h-2z' fill='%23E8749A'/><path d='M4 1h1v1h-1z' fill='%239e3350'/><path d='M0 2h1v1h-1z' fill='%239e3350'/><path d='M1 2h1v1h-1z' fill='%23E8749A'/><path d='M2 2h2v1h-2z' fill='%23ffd1de'/><path d='M4 2h1v1h-1z' fill='%23E8749A'/><path d='M5 2h1v1h-1z' fill='%239e3350'/><path d='M0 3h1v1h-1z' fill='%239e3350'/><path d='M1 3h1v1h-1z' fill='%23E8749A'/><path d='M2 3h2v1h-2z' fill='%23ffd1de'/><path d='M4 3h1v1h-1z' fill='%23E8749A'/><path d='M5 3h1v1h-1z' fill='%239e3350'/><path d='M1 4h1v1h-1z' fill='%239e3350'/><path d='M2 4h2v1h-2z' fill='%23E8749A'/><path d='M4 4h1v1h-1z' fill='%239e3350'/><path d='M2 5h2v1h-2z' fill='%239e3350'/></svg>");
+  --px-basket: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'><path d='M1 0h6v1h-6z' fill='%233B2412'/><path d='M0 1h1v1h-1z' fill='%233B2412'/><path d='M1 1h1v1h-1z' fill='%23E8749A'/><path d='M2 1h1v1h-1z' fill='%23E8749A'/><path d='M3 1h1v1h-1z' fill='%23E8749A'/><path d='M4 1h1v1h-1z' fill='%23E8749A'/><path d='M5 1h1v1h-1z' fill='%23E8749A'/><path d='M6 1h1v1h-1z' fill='%23E8749A'/><path d='M7 1h1v1h-1z' fill='%233B2412'/><path d='M0 2h1v1h-1z' fill='%233B2412'/><path d='M1 2h6v1h-6z' fill='%23FFF6E0'/><path d='M7 2h1v1h-1z' fill='%233B2412'/><path d='M0 3h1v1h-1z' fill='%233B2412'/><path d='M1 3h1v1h-1z' fill='%237A5230'/><path d='M2 3h1v1h-1z' fill='%23FFF6E0'/><path d='M3 3h2v1h-2z' fill='%237A5230'/><path d='M5 3h1v1h-1z' fill='%23FFF6E0'/><path d='M6 3h1v1h-1z' fill='%237A5230'/><path d='M7 3h1v1h-1z' fill='%233B2412'/><path d='M0 4h1v1h-1z' fill='%233B2412'/><path d='M1 4h1v1h-1z' fill='%237A5230'/><path d='M2 4h1v1h-1z' fill='%23FFF6E0'/><path d='M3 4h2v1h-2z' fill='%237A5230'/><path d='M5 4h1v1h-1z' fill='%23FFF6E0'/><path d='M6 4h1v1h-1z' fill='%237A5230'/><path d='M7 4h1v1h-1z' fill='%233B2412'/><path d='M0 5h1v1h-1z' fill='%233B2412'/><path d='M1 5h1v1h-1z' fill='%237A5230'/><path d='M2 5h1v1h-1z' fill='%23FFF6E0'/><path d='M3 5h2v1h-2z' fill='%237A5230'/><path d='M5 5h1v1h-1z' fill='%23FFF6E0'/><path d='M6 5h1v1h-1z' fill='%237A5230'/><path d='M7 5h1v1h-1z' fill='%233B2412'/><path d='M1 6h1v1h-1z' fill='%233B2412'/><path d='M2 6h4v1h-4z' fill='%237A5230'/><path d='M6 6h1v1h-1z' fill='%233B2412'/><path d='M2 7h4v1h-4z' fill='%233B2412'/></svg>");
+  --px-grass: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'><path d='M0 0h16v1h-16z' fill='%236FA644'/><path d='M0 1h3v1h-3z' fill='%236FA644'/><path d='M3 1h1v1h-1z' fill='%235E9138'/><path d='M4 1h8v1h-8z' fill='%236FA644'/><path d='M12 1h1v1h-1z' fill='%2382B953'/><path d='M13 1h3v1h-3z' fill='%236FA644'/><path d='M0 2h2v1h-2z' fill='%236FA644'/><path d='M2 2h2v1h-2z' fill='%235E9138'/><path d='M4 2h3v1h-3z' fill='%236FA644'/><path d='M7 2h1v1h-1z' fill='%2382B953'/><path d='M8 2h4v1h-4z' fill='%236FA644'/><path d='M12 2h1v1h-1z' fill='%2382B953'/><path d='M13 2h3v1h-3z' fill='%236FA644'/><path d='M0 3h16v1h-16z' fill='%236FA644'/><path d='M0 4h6v1h-6z' fill='%236FA644'/><path d='M6 4h1v1h-1z' fill='%2382B953'/><path d='M7 4h6v1h-6z' fill='%236FA644'/><path d='M13 4h1v1h-1z' fill='%235E9138'/><path d='M14 4h2v1h-2z' fill='%236FA644'/><path d='M0 5h2v1h-2z' fill='%236FA644'/><path d='M2 5h1v1h-1z' fill='%2382B953'/><path d='M3 5h9v1h-9z' fill='%236FA644'/><path d='M12 5h2v1h-2z' fill='%235E9138'/><path d='M14 5h2v1h-2z' fill='%236FA644'/><path d='M0 6h2v1h-2z' fill='%236FA644'/><path d='M2 6h1v1h-1z' fill='%2382B953'/><path d='M3 6h13v1h-13z' fill='%236FA644'/><path d='M0 7h16v1h-16z' fill='%236FA644'/><path d='M0 8h11v1h-11z' fill='%236FA644'/><path d='M11 8h1v1h-1z' fill='%235E9138'/><path d='M12 8h4v1h-4z' fill='%236FA644'/><path d='M0 9h2v1h-2z' fill='%236FA644'/><path d='M2 9h1v1h-1z' fill='%2382B953'/><path d='M3 9h7v1h-7z' fill='%236FA644'/><path d='M10 9h2v1h-2z' fill='%235E9138'/><path d='M12 9h4v1h-4z' fill='%236FA644'/><path d='M0 10h2v1h-2z' fill='%236FA644'/><path d='M2 10h1v1h-1z' fill='%2382B953'/><path d='M3 10h13v1h-13z' fill='%236FA644'/><path d='M0 11h16v1h-16z' fill='%236FA644'/><path d='M0 12h2v1h-2z' fill='%236FA644'/><path d='M2 12h1v1h-1z' fill='%235E9138'/><path d='M3 12h4v1h-4z' fill='%236FA644'/><path d='M7 12h1v1h-1z' fill='%2382B953'/><path d='M8 12h8v1h-8z' fill='%236FA644'/><path d='M0 13h1v1h-1z' fill='%236FA644'/><path d='M1 13h2v1h-2z' fill='%235E9138'/><path d='M3 13h4v1h-4z' fill='%236FA644'/><path d='M7 13h1v1h-1z' fill='%2382B953'/><path d='M8 13h8v1h-8z' fill='%236FA644'/><path d='M0 14h16v1h-16z' fill='%236FA644'/><path d='M0 15h16v1h-16z' fill='%236FA644'/></svg>");
+  --px-soil: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'><path d='M0 0h8v1h-8z' fill='%235E3C20'/><path d='M0 1h1v1h-1z' fill='%235E3C20'/><path d='M1 1h6v1h-6z' fill='%238F6238'/><path d='M7 1h1v1h-1z' fill='%235E3C20'/><path d='M0 2h1v1h-1z' fill='%235E3C20'/><path d='M1 2h1v1h-1z' fill='%238F6238'/><path d='M2 2h4v1h-4z' fill='%237A5230'/><path d='M6 2h1v1h-1z' fill='%238F6238'/><path d='M7 2h1v1h-1z' fill='%235E3C20'/><path d='M0 3h1v1h-1z' fill='%235E3C20'/><path d='M1 3h1v1h-1z' fill='%238F6238'/><path d='M2 3h4v1h-4z' fill='%237A5230'/><path d='M6 3h1v1h-1z' fill='%238F6238'/><path d='M7 3h1v1h-1z' fill='%235E3C20'/><path d='M0 4h1v1h-1z' fill='%235E3C20'/><path d='M1 4h1v1h-1z' fill='%238F6238'/><path d='M2 4h4v1h-4z' fill='%237A5230'/><path d='M6 4h1v1h-1z' fill='%238F6238'/><path d='M7 4h1v1h-1z' fill='%235E3C20'/><path d='M0 5h1v1h-1z' fill='%235E3C20'/><path d='M1 5h1v1h-1z' fill='%238F6238'/><path d='M2 5h4v1h-4z' fill='%237A5230'/><path d='M6 5h1v1h-1z' fill='%238F6238'/><path d='M7 5h1v1h-1z' fill='%235E3C20'/><path d='M0 6h1v1h-1z' fill='%235E3C20'/><path d='M1 6h6v1h-6z' fill='%238F6238'/><path d='M7 6h1v1h-1z' fill='%235E3C20'/><path d='M0 7h8v1h-8z' fill='%235E3C20'/></svg>");
+}
+
+/* ---------- ground ---------- */
+
+body {
+  padding: 0;
+  color: var(--soil);
+  background-color: var(--grass);
+  background-image: var(--px-grass);
+  background-size: 64px 64px;
+  background-attachment: fixed;
+  font-family: Mitr, "Noto Sans Thai", sans-serif;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.65;
+  image-rendering: pixelated;
+}
+
+main { max-width: 528px; }
+button { -webkit-tap-highlight-color: transparent; }
+
+.sakura-screen {
+  min-height: 100vh;
+  padding: max(24px, env(safe-area-inset-top)) 16px max(40px, env(safe-area-inset-bottom));
+}
+
+/* ---------- pixel primitives ---------- */
+
+/* One sprite class per icon; size is set by whatever is using it. */
+.px {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  background: center / contain no-repeat;
+}
+.px-coin { background-image: var(--px-coin); }
+.px-water { background-image: var(--px-water); }
+.px-sprout { background-image: var(--px-sprout); }
+.px-petal { background-image: var(--px-petal); }
+.px-basket { background-image: var(--px-basket); }
+
+/* The menu box: dark outline, wood band, parchment face, cast onto the field. */
+.garden-stage,
+.garden-notice,
+.care-sheet,
+.sticker-book,
+.dev-tools,
+.shop-list article,
+.eq-board,
+.hint-slip,
+.win-slip {
+  position: relative;
+  border: var(--u) solid var(--plank);
+  border-radius: 0;
+  background: var(--parch);
+  box-shadow:
+    0 0 0 var(--u) var(--soil),
+    inset 0 0 0 var(--u) var(--plank-lo),
+    0 calc(var(--u) * 2) 0 var(--u) var(--grass-lo);
+}
+
+/* Buttons are wooden and physically press down 1 pixel-unit. */
+.paper-back,
+.garden-notice button,
+.care-button,
+.garden-nav button,
+.finish-garden,
+.dev-tools button,
+.shop-list button,
+.game-ticket,
+.game-tools button,
+.win-slip button {
+  border: var(--u) solid var(--soil);
+  border-radius: 0;
+  background: var(--plank);
+  color: var(--cream);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  box-shadow:
+    inset 0 var(--u) 0 var(--plank-hi),
+    inset 0 calc(var(--u) * -1) 0 var(--plank-lo),
+    0 var(--u) 0 var(--soil);
+}
+.paper-back:not(:disabled):active,
+.garden-notice button:not(:disabled):active,
+.care-button:not(:disabled):active,
+.garden-nav button:not(:disabled):active,
+.finish-garden:not(:disabled):active,
+.dev-tools button:not(:disabled):active,
+.shop-list button:not(:disabled):active,
+.game-ticket:not(:disabled):active,
+.game-tools button:not(:disabled):active,
+.win-slip button:not(:disabled):active {
+  transform: translateY(var(--u));
+  box-shadow:
+    inset 0 var(--u) 0 var(--plank-hi),
+    inset 0 calc(var(--u) * -1) 0 var(--plank-lo);
+}
+.care-button:disabled,
+.shop-list button:disabled,
+.game-tools button:disabled {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+  cursor: default;
+}
+
+button:focus-visible {
+  outline: var(--u) solid #0b63c5;
+  outline-offset: var(--u);
+}
+
+/* ---------- title ---------- */
+
+.sakura-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 0 16px;
+}
+.sakura-kicker,
+.shop-header p,
+.game-header p {
+  margin: 0;
+  color: var(--cream);
+  font-size: 13px;
+  font-weight: 400;
+  text-shadow: 0 var(--u2) 0 var(--soil-lo);
+}
+.sakura-topline h1,
+.shop-header h1,
+.game-header h1 {
+  margin: 0;
+  color: var(--cream);
+  font-size: clamp(26px, 7.5vw, 34px);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-shadow: var(--u) var(--u) 0 var(--soil-lo);
+}
+
+.env-ribbon {
+  flex: none;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 0;
+  background: var(--coin);
+  color: var(--soil);
+  box-shadow: 0 0 0 var(--u) var(--soil);
+  font: 700 12px/1 Silkscreen, monospace;
+  letter-spacing: 1px;
+  transform: none;
+}
+
+/* The launch-failure screen has a bare h1 and footnote with no topline around
+   them, so they need the same field treatment the titles get. */
+.sakura-screen > h1 {
+  margin: 0 0 4px;
+  color: var(--cream);
+  font-size: clamp(26px, 7.5vw, 34px);
+  font-weight: 600;
+  line-height: 1.25;
+  text-shadow: var(--u) var(--u) 0 var(--soil-lo);
+}
+.sakura-screen > .footnote {
+  color: var(--cream);
+  font-size: 13px;
+  text-shadow: 0 var(--u2) 0 var(--soil-lo);
+}
+
+/* ---------- the plot ---------- */
+
+.garden-stage {
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  min-height: 428px;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--grass);
+  background-image: var(--px-grass);
+  background-size: 64px 64px;
+}
+
+/* Hoed soil the tree is planted in, sitting directly on the caption band. */
+.stage-caption::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 88px;
+  border-top: var(--u) solid var(--soil);
+  background-image: var(--px-soil);
+  background-size: 32px 32px;
+}
+
+.hero-tree {
+  position: relative;
+  z-index: 5;
+  width: min(300px, 76vw);
+  height: 288px;
+  object-fit: contain;
+  animation: tree-arrive 0.5s steps(5) both;
+}
+
+.petal {
+  position: absolute;
+  z-index: 2;
+  width: 24px;
+  height: 24px;
+  color: transparent;
+  font-size: 0;
+  background: var(--px-petal) center / contain no-repeat;
+  transform: none;
+  pointer-events: none;
+}
+.petal-a { top: -20px; left: 16%; animation: petal-fall 11s steps(26) infinite; }
+.petal-b { top: -20px; right: 22%; animation: petal-fall 14s steps(32) 3s infinite; }
+
+/* Stardew's dialogue box, spanning the foot of the plot. */
+.stage-caption {
+  position: relative;
+  z-index: 4;
+  justify-self: stretch;
+  width: 100%;
+  padding: 12px 16px 14px;
+  border: 0;
+  border-top: var(--u) solid var(--soil);
+  border-radius: 0;
+  background: var(--parch);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.stage-caption p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.stage-caption h2 { margin: 0 0 8px; font-size: 19px; font-weight: 600; line-height: 1.3; }
+.stage-caption small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }
+
+/* Growth reads as 12 discrete notches, one per care point. */
+.growth-meter {
+  position: relative;
+  height: 20px;
+  overflow: hidden;
+  border: var(--u) solid var(--soil);
+  border-radius: 0;
+  background: var(--parch-sink);
+}
+.growth-meter span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  background: var(--bloom);
+  transform: scaleX(var(--growth-scale, 0));
+  transform-origin: left center;
+  transition: transform 0.5s steps(12);
+}
+.growth-meter::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 calc(100% / 12 - 2px),
+    var(--soil) calc(100% / 12 - 2px) calc(100% / 12)
+  );
+}
+
+/* ---------- inventory hotbar ---------- */
+
+.sv-hotbar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--u);
+  margin: 24px 0 0;
+  padding: var(--u);
+  border: var(--u) solid var(--plank);
+  background: var(--plank-lo);
+  box-shadow: 0 0 0 var(--u) var(--soil), 0 calc(var(--u) * 2) 0 var(--u) var(--grass-lo);
+  list-style: none;
+}
+.sv-slot {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 10px 4px 8px;
+  background: var(--parch);
+  box-shadow:
+    inset var(--u) var(--u) 0 var(--parch-sink),
+    inset calc(var(--u) * -1) calc(var(--u) * -1) 0 var(--parch-hi);
+}
+.sv-slot .px { width: 32px; height: 32px; }
+.sv-slot b { font: 700 16px/1.4 Silkscreen, monospace; }
+.sv-slot small { color: var(--muted); font-size: 11px; line-height: 1.4; }
+
+/* ---------- notices ---------- */
+
+.garden-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 20px 0 0;
+  padding: 12px 14px;
+  color: var(--soil);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.garden-notice.error { background: #f6c6b4; }
+.garden-notice button { flex: none; padding: 8px 10px; font-size: 12px; }
+
+/* ---------- daily care ---------- */
+
+.care-sheet,
+.sticker-book { margin-top: 28px; padding: 16px; }
+
+.sheet-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: var(--u) solid var(--parch-lo);
+}
+.sheet-heading p { margin: 0; color: var(--muted); font-size: 12px; }
+.sheet-heading h2 { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.35; }
+.sheet-heading > span { flex: none; color: var(--muted); font-size: 12px; }
+
+.care-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.care-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 72px;
+  padding: 10px;
+  color: var(--soil);
+}
+.care-button.water { background: var(--sky); box-shadow: inset 0 var(--u) 0 #b9e4fb, inset 0 calc(var(--u) * -1) 0 #5aa9e0, 0 var(--u) 0 var(--soil); }
+.care-button.fertilizer { background: var(--leaf); box-shadow: inset 0 var(--u) 0 #c2ea8f, inset 0 calc(var(--u) * -1) 0 var(--grass), 0 var(--u) 0 var(--soil); }
+.care-button.water:not(:disabled):active { box-shadow: inset 0 var(--u) 0 #b9e4fb, inset 0 calc(var(--u) * -1) 0 #5aa9e0; }
+.care-button.fertilizer:not(:disabled):active { box-shadow: inset 0 var(--u) 0 #c2ea8f, inset 0 calc(var(--u) * -1) 0 var(--grass); }
+.care-icon { flex: none; width: 32px; height: 32px; }
+.care-button b, .care-button small { display: block; }
+.care-button b { font-size: 14px; font-weight: 500; line-height: 1.4; }
+.care-button small { color: #3f5a2c; font-size: 11px; line-height: 1.4; }
+.care-button.water small { color: #23506e; }
+
+/* ---------- the two signs ---------- */
+
+.garden-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px; }
+.garden-nav button { min-height: 124px; padding: 14px; }
+.garden-nav button:last-child { background: var(--bloom); box-shadow: inset 0 var(--u) 0 #f294b1, inset 0 calc(var(--u) * -1) 0 var(--bloom-lo), 0 var(--u) 0 var(--soil); }
+.garden-nav button:last-child:not(:disabled):active { box-shadow: inset 0 var(--u) 0 #f294b1, inset 0 calc(var(--u) * -1) 0 var(--bloom-lo); }
+.nav-glyph {
+  display: block;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 10px;
+  color: var(--coin);
+  font: 700 32px/40px Silkscreen, monospace;
+  text-shadow: 0 var(--u) 0 var(--soil-lo);
+}
+.garden-nav b, .garden-nav small { display: block; }
+.garden-nav b { font-size: 16px; font-weight: 500; line-height: 1.4; }
+.garden-nav small { font-size: 11px; line-height: 1.5; opacity: 0.8; }
+
+/* ---------- sticker book ---------- */
+
+.sakura-trail {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--u);
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.sakura-trail li {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  padding: var(--u);
+  opacity: 1;
+  filter: none;
+  background: var(--parch-lo);
+  box-shadow:
+    inset var(--u) var(--u) 0 var(--parch-sink),
+    inset calc(var(--u) * -1) calc(var(--u) * -1) 0 var(--parch-hi);
+}
+.sakura-trail li:not(.reached) { filter: grayscale(1) brightness(0.92); }
+.sakura-trail li:not(.reached) img { opacity: 0.3; }
+.sakura-trail img { width: 100%; aspect-ratio: 1; object-fit: contain; }
+.sakura-trail span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 0;
+  background: var(--soil);
+  color: var(--cream);
+  font: 700 10px/1 Silkscreen, monospace;
+}
+
+/* ---------- dev + finish ---------- */
+
+.dev-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 12px 14px;
+  background: var(--coin);
+}
+.dev-tools b, .dev-tools small { display: block; }
+.dev-tools b { font-size: 13px; font-weight: 500; }
+.dev-tools small { font-size: 10px; line-height: 1.5; opacity: 0.75; }
+.dev-tools button { flex: none; display: flex; align-items: center; gap: 6px; padding: 8px 10px; font-size: 13px; }
+
+.finish-garden,
+.finish-garden + .garden-closed { margin-top: 24px; }
+.finish-garden {
+  width: 100%;
+  min-height: 56px;
+  background: var(--bloom);
+  font-weight: 500;
+  text-align: center;
+  box-shadow: inset 0 var(--u) 0 #f294b1, inset 0 calc(var(--u) * -1) 0 var(--bloom-lo), 0 var(--u) 0 var(--soil);
+}
+.finish-garden:not(:disabled):active { box-shadow: inset 0 var(--u) 0 #f294b1, inset 0 calc(var(--u) * -1) 0 var(--bloom-lo); }
+.garden-closed {
+  margin-top: 24px;
+  color: var(--cream);
+  font-weight: 500;
+  text-align: center;
+  text-shadow: 0 var(--u) 0 var(--soil-lo);
+}
+
+/* ---------- shop + game ---------- */
+
+.paper-back { display: inline-block; margin: 0 0 20px; padding: 8px 12px; font-size: 13px; }
+.shop-header, .game-header { margin-bottom: 20px; }
+.shop-header h1 { font-size: clamp(24px, 6.5vw, 30px); }
+.game-header > span { display: block; margin-top: 6px; color: var(--cream); font-size: 13px; text-shadow: 0 var(--u2) 0 var(--soil-lo); }
+
+.shop-list { display: grid; gap: 14px; margin-top: 22px; }
+.shop-list article {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+}
+.shop-icon { flex: none; width: 40px; height: 40px; }
+.shop-list h2 { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.4; }
+.shop-list p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.shop-list button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 78px;
+  min-height: 48px;
+  padding: 10px;
+  color: var(--coin);
+  font: 700 16px/1 Silkscreen, monospace;
+}
+.shop-list button .px { width: 20px; height: 20px; }
+
+.game-ticket { display: block; width: 100%; margin-top: 20px; padding: 16px; }
+.game-ticket span, .game-ticket b { display: block; }
+.game-ticket span { font-size: 12px; opacity: 0.8; }
+.game-ticket b { margin-top: 2px; font-weight: 500; }
+
+.game-header { text-align: center; }
+.game-header h1 { font-size: clamp(30px, 9vw, 40px); }
+
+/* Equation builder: one sunken drop strip, two block trays. Blocks are buttons
+   so the keyboard path works, and `touch-action: none` lets pointer drag own
+   the gesture. */
+.eq-board { margin-top: 20px; padding: 14px; }
+.eq-title { margin: 0 0 10px; color: var(--muted); font-size: 12px; font-weight: 400; }
+.eq-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 84px;
+  padding: 12px;
+  border: 0;
+  border-radius: 0;
+  background: var(--parch-sink);
+  box-shadow:
+    inset var(--u) var(--u) 0 #b08f56,
+    inset calc(var(--u) * -1) calc(var(--u) * -1) 0 var(--parch-hi);
+  touch-action: none;
+}
+.eq-strip.dropping { background: var(--bloom); box-shadow: inset var(--u) var(--u) 0 var(--bloom-lo), inset calc(var(--u) * -1) calc(var(--u) * -1) 0 #f8b4c8; }
+.eq-empty { margin: auto; color: var(--muted); font-size: 13px; text-align: center; }
+.eq-caret { width: var(--u); height: 40px; border-radius: 0; background: var(--soil); }
+.eq-readout { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+.eq-readout span { color: var(--muted); font: 400 18px/1 Silkscreen, monospace; }
+.eq-readout b { font: 700 32px/1 Silkscreen, monospace; }
+.eq-readout.hit b { color: #2f6d18; }
+
+.tray-block { margin-top: 20px; }
+.tray-block h2 { margin: 0 0 10px; color: var(--cream); font-size: 12px; font-weight: 400; text-shadow: 0 var(--u2) 0 var(--soil-lo); }
+.tray { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.block {
+  min-width: 56px;
+  min-height: 56px;
+  padding: 0 12px;
+  border: var(--u) solid var(--soil);
+  border-radius: 0;
+  background: var(--parch);
+  color: var(--soil);
+  font: 700 24px/1 Silkscreen, monospace;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: inset 0 var(--u) 0 var(--parch-hi), inset 0 calc(var(--u) * -1) 0 var(--parch-lo), 0 var(--u) 0 var(--soil);
+}
+.block.num { background: var(--bloom); color: var(--cream); box-shadow: inset 0 var(--u) 0 #f294b1, inset 0 calc(var(--u) * -1) 0 var(--bloom-lo), 0 var(--u) 0 var(--soil); }
+.block.op, .block.paren { font: 600 26px/1 Mitr, sans-serif; background: var(--plank); color: var(--cream); box-shadow: inset 0 var(--u) 0 var(--plank-hi), inset 0 calc(var(--u) * -1) 0 var(--plank-lo), 0 var(--u) 0 var(--soil); }
+.block.lifted { opacity: 0.3; }
+.block.spent { opacity: 0.3; filter: grayscale(1); box-shadow: none; cursor: default; }
+.block.placed { min-width: 48px; min-height: 48px; padding: 0 8px; font-size: 20px; }
+.block.ghost { position: fixed; left: 0; top: 0; z-index: 40; display: grid; place-items: center; pointer-events: none; }
+
+.game-instruction { min-height: 42px; margin: 18px 0 0; color: var(--cream); font-size: 13px; font-weight: 400; text-align: center; text-shadow: 0 var(--u2) 0 var(--soil-lo); }
+.game-tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 16px; }
+.game-tools button { min-height: 48px; padding: 8px 10px; font-size: 12px; text-align: center; }
+.hint-slip { margin-top: 16px; padding: 14px; font-size: 13px; line-height: 1.6; }
+.win-slip { margin-top: 24px; padding: 22px 18px; text-align: center; }
+.win-slip span { display: inline-flex; align-items: center; gap: 8px; color: #8b641c; font: 700 22px/1 Silkscreen, monospace; }
+.win-slip span .px { width: 24px; height: 24px; }
+.win-slip h2 { margin: 10px 0 0; font-size: 24px; font-weight: 600; }
+.win-slip p { margin: 4px 0 18px; color: var(--muted); font-size: 18px; font-weight: 500; }
+.win-slip button { width: 100%; min-height: 52px; background: var(--coin); color: var(--soil); font-weight: 500; text-align: center; box-shadow: inset 0 var(--u) 0 #ffe07a, inset 0 calc(var(--u) * -1) 0 #c89a18, 0 var(--u) 0 var(--soil); }
+.win-slip button:not(:disabled):active { box-shadow: inset 0 var(--u) 0 #ffe07a, inset 0 calc(var(--u) * -1) 0 #c89a18; }
+
+/* ---------- earned sticker ---------- */
+
+.result-screen { display: grid; justify-items: center; align-content: start; padding-top: max(40px, env(safe-area-inset-top)); text-align: center; }
+.result-screen h1 { margin: 6px 0 20px; color: var(--cream); font-size: clamp(26px, 7.5vw, 34px); font-weight: 600; text-shadow: var(--u) var(--u) 0 var(--soil-lo); }
+.result-screen img {
+  width: min(288px, 76vw);
+  aspect-ratio: 1;
+  margin: 0 0 20px;
+  padding: var(--u);
+  object-fit: contain;
+  background: var(--parch);
+  box-shadow:
+    0 0 0 var(--u) var(--plank),
+    0 0 0 calc(var(--u) * 2) var(--soil),
+    inset var(--u) var(--u) 0 var(--parch-sink);
+}
+.result-screen > p:not(.sakura-kicker) { margin: 0; color: var(--cream); font-size: 15px; font-weight: 500; text-shadow: 0 var(--u2) 0 var(--soil-lo); }
+.result-screen h2 { margin: 4px 0 8px; color: var(--cream); font-size: 20px; font-weight: 600; text-shadow: 0 var(--u) 0 var(--soil-lo); }
+.result-screen small { max-width: 330px; color: var(--cream); font-size: 12px; line-height: 1.6; text-shadow: 0 var(--u2) 0 var(--soil-lo); }
+
+/* ---------- motion ---------- */
+
+@keyframes tree-arrive {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes petal-fall {
+  from { transform: translate(0, 0); }
+  50% { transform: translate(-24px, 220px); }
+  to { transform: translate(16px, 460px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-tree, .petal { animation: none; }
+  .petal { display: none; }
+  .growth-meter span { transition: none; }
+}
+
+/* ---------- small screens ---------- */
+
+@media (max-width: 365px) {
+  .sakura-screen { padding-inline: 12px; }
+  .garden-stage { min-height: 392px; }
+  .stage-caption::before { height: 76px; }
+  .hero-tree { height: 256px; }
+  .care-actions { grid-template-columns: 1fr; }
+  .garden-nav button { min-height: 112px; }
+  .sv-slot small { font-size: 10px; }
+}
+
+/* ---------- night ---------- */
+
+/* The menu boxes are lamplit and stay parchment, exactly as they do in the
+   game; only the field and the plot fall into moonlight. Multiplying the tile
+   against a night colour keeps the baked sprite palette intact. */
+@media (prefers-color-scheme: dark) {
+  body, .garden-stage {
+    background-color: #4a6a96;
+    background-blend-mode: multiply;
+  }
+  :root {
+    --grass-lo: #1f2e1c;
+    --cream: #ffeecb;
+    --soil-lo: #100a04;
+  }
+  .stage-caption::before { filter: brightness(0.68) saturate(0.85); }
+}

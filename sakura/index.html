@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#FFF9F7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#18231C" media="(prefers-color-scheme: dark)" />
+    <title>ซากุระของฉัน</title>
+    <link rel="stylesheet" href="../app.css" />
+    <link rel="stylesheet" href="../sakura.css" />
+  </head>
+  <body>
+    <main id="app">
+      <div class="sakura-screen"><p class="garden-notice">กำลังเปิดสวนซากุระ…</p></div>
+    </main>
+
+    <script src="../config.js"></script>
+    <script src="../launch.js"></script>
+    <script src="../sakura.js"></script>
+    <script>
+      /**
+       * Real continuous activity: Model-B launch handoff + one checkpoint per
+       * tree level. Local storage is scoped by run_id from the report token so
+       * Dreambook's “start over” action gets a fresh garden.
+       *
+       * An iframe host also hears `level_complete` per recorded level,
+       * `activity_finished` when the run closes and `activity_error` when the
+       * garden cannot open (launch.js's postToApp). In the WebView
+       * `window.parent === window`, so there every post is a no-op.
+       */
+      (function () {
+        'use strict';
+
+        const {
+          LEVELS, el, esc, normalizeState, stageForGrowth, localDateKey,
+          buyItem, tendTree, mintCoins, awardGame, renderHome, renderShop, renderGame,
+        } = SakuraKit;
+        const { QS, API, API_IS_SECURE, verifyLaunchToken, callback, postToApp } = Launch;
+
+        const EXPECTED_AUD = QS.get('aud') || 'sakura-garden';
+        const ASSET_ROOT = '../assets/sakura';
+        const app = document.getElementById('app');
+        // The ribbon names any non-prod env so a local page is never mistaken
+        // for the deployed dev one. The dev tools are a separate question:
+        // config.js grants them on local only, because a dev deploy still
+        // reports into a real backend.
+        const ENV = window.APP_CONFIG?.env || 'prod';
+        const ENV_LABEL = ENV === 'prod' ? '' : ENV.toUpperCase();
+        const allowMint = window.APP_CONFIG?.features?.mintCoins === true;
+
+        let claims = null;
+        let context = null;
+        let state = null;
+        let storageKey = null;
+        let status = '';
+        let statusKind = '';
+        let pendingSync = false;
+
+        const fail = (message, detail) => {
+          postToApp('activity_error', { message });
+          app.innerHTML = '';
+          const view = el(`<div class="sakura-screen"><button class="paper-back" type="button" data-reload>ลองใหม่</button><h1>เปิดสวนไม่ได้</h1><p class="garden-notice error">${esc(message)}</p>${detail ? `<p class="footnote" style="margin-top:12px">${esc(detail)}</p>` : ''}</div>`);
+          view.querySelector('[data-reload]').addEventListener('click', () => location.reload());
+          app.append(view);
+        };
+
+        // Parsing this payload does not establish trust; Launch already verifies
+        // the launch token and Dreambook verifies this report token on callback.
+        // The run_id is used only to partition local UI state between runs.
+        const runIdForStorage = (reportToken) => {
+          try {
+            const raw = reportToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+            const bytes = Uint8Array.from(
+              atob(raw.padEnd(Math.ceil(raw.length / 4) * 4, '=')),
+              (char) => char.charCodeAt(0),
+            );
+            const payload = JSON.parse(new TextDecoder().decode(bytes));
+            return payload.run_id || 'open-run';
+          } catch {
+            return 'open-run';
+          }
+        };
+
+        const load = () => {
+          try {
+            return normalizeState(JSON.parse(localStorage.getItem(storageKey) || 'null'));
+          } catch (err) {
+            console.warn('garden state unavailable:', err.message);
+            return normalizeState(null);
+          }
+        };
+
+        const save = () => {
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(state));
+          } catch (err) {
+            console.warn('garden state not saved:', err.message);
+          }
+        };
+
+        const friendlyError = (err) => {
+          if (err.code === 'run_closed') return 'รอบนี้จบไปแล้ว เปิดกิจกรรมใหม่จาก Dreambook เพื่อเริ่มสวนใหม่';
+          if (err.code === 'invalid_level') return 'Dreambook ยังไม่ได้ตั้งสติกเกอร์ระดับนี้ใน catalog';
+          if (err.status === 401) return 'เวลารายงานผลหมดแล้ว ปิดหน้านี้และเปิดกิจกรรมใหม่จาก Dreambook';
+          if (err.status === 403 || err.status === 404) return 'สวนนี้ไม่ตรงกับรอบที่เปิดอยู่ ลองเปิดใหม่จาก Dreambook';
+          return `บันทึกไป Dreambook ไม่สำเร็จ: ${err.message}`;
+        };
+
+        async function syncLevels() {
+          const target = stageForGrowth(state.growth).level;
+          const newlyGranted = [];
+          for (let level = 1; level <= target; level += 1) {
+            if (state.reportedLevels.includes(level)) continue;
+            const response = await callback(
+              'PUT',
+              `/activities/${encodeURIComponent(claims.activity_id)}/progress`,
+              claims.report_token,
+              { level, result_id: `sakura-l${level}` },
+            );
+            state.reportedLevels = [...state.reportedLevels, level].sort((a, b) => a - b);
+            // Empty on an idempotent retry of a level already recorded, so
+            // `granted` and `sticker_id` fall away together.
+            const stamp = (response.stamps_granted || [])[0] || null;
+            const granted = !!stamp;
+            if (granted) newlyGranted.push(level);
+            save();
+            // After the 2xx only: the app must not look for a stamp Dreambook
+            // has not written yet.
+            postToApp('level_complete', {
+              level,
+              result_id: `sakura-l${level}`,
+              granted,
+              ...(stamp?.sticker_id ? { sticker_id: stamp.sticker_id } : {}),
+              done: state.reportedLevels.length,
+              total: LEVELS.length,
+            });
+          }
+          return newlyGranted;
+        }
+
+        const commonHomeOptions = () => ({
+          state,
+          name: context?.nickname || claims.name || 'เพื่อน',
+          dateKey: localDateKey(),
+          dateLabel: new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short' }).format(new Date()),
+          assetRoot: ASSET_ROOT,
+          envLabel: ENV_LABEL,
+          status,
+          statusKind,
+          onRetry: pendingSync ? retrySync : null,
+          onCare: care,
+          onShop: shop,
+          onGame: game,
+          onMint: allowMint ? mint : null,
+          onFinish: finish,
+        });
+
+        function home(message = status, kind = statusKind) {
+          status = message || '';
+          statusKind = kind || '';
+          renderHome(app, commonHomeOptions());
+        }
+
+        function shop(message = '', kind = '') {
+          renderShop(app, {
+            state, status: message, statusKind: kind,
+            onBack: () => home(),
+            onGame: game,
+            onBuy: (itemKey) => {
+              const result = buyItem(state, itemKey);
+              state = result.state;
+              if (result.ok) save();
+              shop(result.message, result.ok ? '' : 'error');
+            },
+          });
+        }
+
+        function game() {
+          renderGame(app, {
+            onBack: () => home(),
+            onWin: () => {
+              state = awardGame(state);
+              save();
+              home(`เก่งมาก! เกม 24 เพิ่ม ${SakuraKit.GAME_REWARD} เหรียญแล้ว`);
+            },
+          });
+        }
+
+        async function care(itemKey) {
+          const result = tendTree(state, itemKey, localDateKey());
+          state = result.state;
+          if (!result.ok) return home(result.message, 'error');
+          save();
+          home(result.message);
+          try {
+            const granted = await syncLevels();
+            pendingSync = false;
+            home(granted.length ? `${result.message} · ได้สติกเกอร์ระดับ ${granted.at(-1)}` : result.message);
+          } catch (err) {
+            if (err.code === 'run_closed') { state.closed = true; save(); }
+            pendingSync = !err.status || err.status >= 500 || err.status === 429;
+            home(friendlyError(err), 'error');
+          }
+        }
+
+        async function retrySync() {
+          pendingSync = false;
+          home('กำลังลองบันทึกสติกเกอร์อีกครั้ง…');
+          try {
+            const granted = await syncLevels();
+            pendingSync = false;
+            home(granted.length ? `บันทึกแล้ว · ได้สติกเกอร์ระดับ ${granted.at(-1)}` : 'บันทึกการเติบโตแล้ว');
+          } catch (err) {
+            pendingSync = !err.status || err.status >= 500 || err.status === 429;
+            home(friendlyError(err), 'error');
+          }
+        }
+
+        function mint() {
+          if (!allowMint) return;
+          state = mintCoins(state, 100);
+          save();
+          home('Dev mode เพิ่ม 100 เหรียญแล้ว');
+        }
+
+        async function finish() {
+          if (stageForGrowth(state.growth).level !== LEVELS.length || state.closed) return;
+          home('กำลังบันทึกสวนที่โตเต็มที่…');
+          try {
+            await syncLevels();
+            await callback(
+              'PUT',
+              `/activities/${encodeURIComponent(claims.activity_id)}/progress`,
+              claims.report_token,
+              { result_id: 'sakura-l5', completed: true },
+            );
+            state.closed = true;
+            save();
+            postToApp('activity_finished', {
+              result_id: 'sakura-l5',
+              levels: state.reportedLevels,
+              total: LEVELS.length,
+            });
+            home('กิจกรรมสำเร็จ ต้นซากุระทั้ง 5 ระดับถูกบันทึกแล้ว');
+          } catch (err) {
+            if (err.code === 'run_closed') { state.closed = true; save(); return home('กิจกรรมรอบนี้จบแล้ว'); }
+            home(friendlyError(err), 'error');
+          }
+        }
+
+        (async () => {
+          const token = QS.get('token');
+          if (!token) return fail('ไม่พบ launch token', 'เปิดกิจกรรมนี้จากปุ่มเล่นใน Dreambook');
+          if (!API_IS_SECURE) return fail('ปลายทาง Dreambook ไม่ปลอดภัย', `${API} ต้องใช้ HTTPS`);
+
+          try {
+            claims = await verifyLaunchToken(token, EXPECTED_AUD);
+          } catch (err) {
+            return fail('ตรวจสอบ launch token ไม่ผ่าน', err.message);
+          }
+
+          try {
+            context = await callback(
+              'GET',
+              `/activities/${encodeURIComponent(claims.activity_id)}/student-context`,
+              claims.report_token,
+            );
+          } catch (err) {
+            console.warn('student-context unavailable; using launch claims:', err.message);
+          }
+
+          storageKey = `sakura-garden:v1:${claims.activity_id}:${claims.student_id || claims.sub}:${runIdForStorage(claims.report_token)}`;
+          state = load();
+          home('กำลังตรวจสมุดสติกเกอร์…');
+          try {
+            const granted = await syncLevels();
+            pendingSync = false;
+            home(granted.length ? 'เริ่มปลูกแล้ว · ได้สติกเกอร์ต้นกล้าระดับ 1' : 'กลับมาดูแลต้นซากุระต่อกัน');
+          } catch (err) {
+            if (err.code === 'run_closed') { state.closed = true; save(); }
+            pendingSync = !err.status || err.status >= 500 || err.status === 429;
+            home(friendlyError(err), 'error');
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>
