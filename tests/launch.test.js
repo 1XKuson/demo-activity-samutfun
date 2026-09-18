@@ -64,6 +64,11 @@ for (const page of ['sakura/index.html']) {
   assert.match(html, /\.\.\.\(stamp\?\.sticker_id \? \{ sticker_id: stamp\.sticker_id \} : \{\}\)/, `${page} must pass the granted sticker_id through`);
   assert.match(html, /stamps_granted \|\| \[\]\)\[0\]/, `${page} must read the stamp off the PUT response`);
   assert.match(html, /postToApp\('activity_finished'/, `${page} must report the closed run`);
+  // A 401 is the one PUT failure the page cannot recover from on its own: the
+  // host has to mint a new report token, so it must be told (spec §4.1).
+  assert.match(html, /code: 'session_expired'/, `${page} must hand a 401 back to the host`);
+  // result_id belongs to the run, not the level — one per run, sent at finish.
+  assert.doesNotMatch(html, /result_id: `sakura-l\$\{level\}`/, `${page} must not stamp a result id per level`);
 }
 
 console.log('launch postMessage tests passed (3 types, iframe + webview + hostile host, 2 pages)');

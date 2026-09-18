@@ -8,7 +8,7 @@
  * miss the other. Everything activity-specific (the expected `aud`, what to
  * report, what to draw) stays in the route.
  *
- * Implements activity-integration-guideline.md §3.1–3.4 and §5.
+ * Implements documents/activity/spec.md (dreambook-backend) §3.2–3.3 and §4.
  * Classic script, no build step: exposes a single global `Launch`.
  */
 (function (global) {
@@ -17,13 +17,13 @@
   // Where the backend lives: ?api= (debugging) beats config.js (the deployed
   // default, see that file) beats localhost (a bare `git clone`).
   const API = (QS.get('api') || global.APP_CONFIG?.api || 'http://localhost:3000').replace(/\/$/, '');
-  // Callbacks carry the report_token, so they go over HTTPS only (guideline
-  // §5). Plain-HTTP localhost stays allowed so a local backend still works.
+  // Callbacks carry the report_token, so they go over HTTPS only (spec §3.2).
+  // Plain-HTTP localhost stays allowed so a local backend still works.
   const API_IS_SECURE =
     /^https:\/\//.test(API) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(API);
   const EXPECTED_ISS = QS.get('iss') || 'dreambook';
-  // Launch TTL is capped at 900s on the Dreambook side; reject anything
-  // longer-lived, whatever the token claims (guideline §4).
+  // Dreambook mints launch tokens with a ~600s TTL; reject anything much
+  // longer-lived, whatever the token claims (spec §3.3).
   const MAX_TOKEN_TTL_SEC = 900;
 
   // ---------- JWT verify ----------
@@ -40,7 +40,7 @@
   }
 
   /**
-   * Verify the launch JWT. Security checklist (guideline §5):
+   * Verify the launch JWT. Security checklist (spec §3.3):
    * RS256 only, signature against the kid-matched key, iss/aud/exp checked,
    * jti single-use. Throws with a human-readable reason.
    *
@@ -86,7 +86,7 @@
     const now = Math.floor(Date.now() / 1000);
     if (typeof claims.exp !== 'number' || claims.exp <= now) throw new Error('token หมดอายุแล้ว');
     // Cap the lifetime we accept regardless of what the token asks for, so a
-    // long-lived launch token can't be sat on and replayed (guideline §4).
+    // long-lived launch token can't be sat on and replayed (spec §3.3).
     if (claims.exp - now > MAX_TOKEN_TTL_SEC) throw new Error('token อายุยาวเกินกำหนด');
     if (typeof claims.iat === 'number' && claims.exp - claims.iat > MAX_TOKEN_TTL_SEC) {
       throw new Error('อายุ token ตั้งแต่ iat ถึง exp ยาวเกินกำหนด');
@@ -133,10 +133,10 @@
 
   // ---------- Dreambook callbacks ----------
   /**
-   * Call a Dreambook callback with the report token as bearer (guideline §3.4).
+   * Call a Dreambook callback with the report token as bearer (spec §3.2).
    *
    * A non-2xx throws an Error carrying `.status` and `.code` — the machine-
-   * readable half of the guideline's error table (`run_closed`, `invalid_level`,
+   * readable half of the spec's error table (`run_closed`, `invalid_level`,
    * …), which callers branch on to tell "retry this" from "this run is over".
    */
   const callback = async (method, path, reportToken, body) => {

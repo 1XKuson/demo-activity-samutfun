@@ -24,18 +24,17 @@
        * Demo Activity — the smallest possible Dreambook external activity.
        * Answer 3 questions correctly => the run is complete.
        *
-       * Implements documents/activity-integration-guideline.md:
+       * Implements documents/activity/spec.md (dreambook-backend):
        *   1. read ?token         (launch JWT, RS256)
        *   2. verify it against <api>/.well-known/jwks.json  (WebCrypto, kid-matched)
        *      — 1 and 2 live in launch.js, shared with /sakura
        *   3. GET  /activities/:id/student-context  with the report_token
        *   4. PUT  /activities/:id/progress         when all 3 are right
-       *   5. postMessage 'activity_finished' to window.parent, so an app that
-       *      still iframes this closes it and shows "ได้รับสแตมป์ใหม่".
-       *      Kept for the iframe host only — the guideline dropped the whole
-       *      postMessage contract when the app moved to a WebView, where
-       *      window.parent === window and this is a no-op. Standalone: fall
-       *      back to <return>/?sticker=<stickerId>
+       *   5. postMessage 'activity_finished' to window.parent — the app
+       *      embeds this in an iframe (spec §5.1), so this is the only way it
+       *      hears that the run closed. Opened standalone
+       *      window.parent === window and it is a no-op: fall back to
+       *      <return>/?sticker=<stickerId>
        *
        * No build step and no backend of its own: serve this file statically.
        * The questions and quiz rendering live in quiz.js, shared with /demo.

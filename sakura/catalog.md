@@ -1,7 +1,7 @@
 # Dreambook catalog — Sakura Garden
 
 นำค่าชุดนี้ไปเพิ่มใน `prisma/activity-catalog.ts` ของ Dreambook backend แล้วรัน
-`prisma db seed` ตาม `activity-integration-guideline.md` (backend ไม่ได้อยู่ใน repo นี้)
+`prisma db seed` ตาม `documents/activity/spec.md` §6.3 (backend ไม่ได้อยู่ใน repo นี้)
 
 | field | value |
 |---|---|
@@ -31,7 +31,7 @@
 รูปที่ใช้เป็นชุด pixel art ใน `assets/sakura/pixel/` ชุดเดียวกับที่เกมแสดง
 (ไฟล์ต้นฉบับความละเอียดเต็มยังอยู่ที่ `assets/sakura/` แต่ไม่ได้ใช้ใน catalog)
 URL รูปใน catalog ต้องเป็น absolute URL โดยเติม origin ของ env หน้า path ในตาราง
-ด้านบน Activity จะส่งเพียง `{ level, result_id }`; ห้ามส่ง `sticker_id` กลับเอง
+ด้านบน Activity จะส่งเพียง `{ level }`; ห้ามส่ง `sticker_id` กลับเอง
 เพราะ backend เป็นผู้เลือกสติกเกอร์จาก level
 
 ## Growth contract
@@ -39,8 +39,8 @@ URL รูปใน catalog ต้องเป็น absolute URL โดยเ�
 - เริ่มที่ level 1 และรายงาน checkpoint แรกเมื่อเปิดสวนสำเร็จ
 - น้ำให้ growth `+1`, ปุ๋ยให้ `+2`; ให้แต่ละชนิดได้อย่างละหนึ่งครั้งต่อวัน
 - threshold level 1–5 คือ `0, 3, 6, 9, 12`
-- เมื่อข้าม level จะ `PUT /activities/:id/progress` ทีละ level พร้อม
-  `result_id: sakura-l<level>` เพื่อไม่พลาดสติกเกอร์เพราะ level ไม่สะสม
+- เมื่อข้าม level จะ `PUT /activities/:id/progress` ทีละ level เพราะ level ไม่สะสม
+  (`result_id` เป็นของ run ส่งครั้งเดียวตอนปิด ไม่ใช่ของ level)
 - level 5 แล้วนักเรียนกดจบ จึงส่ง `{ result_id: "sakura-l5", completed: true }`
 
 ## Seed entry
@@ -89,7 +89,7 @@ URL รูปใน catalog ต้องเป็น absolute URL โดยเ�
       id: '00000000-0000-4000-b000-000000000013',
       name: 'ผู้ดูแลสวน',
       qr_token: 'sakura-garden-l3',
-      variant: 'pink',
+      variant: 'green',
       image_url: 'http://localhost:8811/assets/sakura/pixel/sticker-level-3.png',
     },
     {
@@ -97,7 +97,7 @@ URL รูปใน catalog ต้องเป็น absolute URL โดยเ�
       id: '00000000-0000-4000-b000-000000000014',
       name: 'ผู้เฝ้าดอกไม้',
       qr_token: 'sakura-garden-l4',
-      variant: 'pink',
+      variant: 'yellow',
       image_url: 'http://localhost:8811/assets/sakura/pixel/sticker-level-4.png',
     },
     {
@@ -116,6 +116,7 @@ URL รูปใน catalog ต้องเป็น absolute URL โดยเ�
 
 entry เดียวกัน เปลี่ยนแค่ origin เป็น
 `https://1xkuson.github.io/demo-activity-samutfun/dev` (prod ตัด `/dev` ออก)
+— **`prisma/activity-catalog.ts` ตอนนี้ seed ชุดนี้อยู่** เหมือนแถวของควิซ
 และใช้ `id` คนละชุดถ้า backend dev กับ prod เป็นคนละฐาน
 
 | field | ค่า |
@@ -128,9 +129,8 @@ entry เดียวกัน เปลี่ยนแค่ origin เป็�
 
 ### ก่อน seed ต้องเช็ค
 
-- **`variant`** — entry ตัวอย่างใช้ `'purple'` ถ้าฟิลด์นี้เป็น enum สีใน schema
-  ให้ใช้ค่าที่ enum รับเท่านั้น ถ้าเป็น string อิสระใช้ค่า semantic จากตารางด้านบน
-  (`sakura-seedling` … `sakura-full-bloom`) จะสื่อกว่า
+- **`variant`** — enum สี 4 ค่า: `green` / `purple` / `yellow` / `orange`
+  (ชื่อ semantic ในตารางด้านบนเป็นแค่คำอธิบายระดับ ใส่ลง catalog ไม่ได้)
 - **`result_url` บน local ใช้ไม่ได้ถ้าเสิร์ฟด้วย `python3 -m http.server`** เพราะ
   ไม่มี 404 shim หน้า `/activity/result/sakura-l3` จะได้ 404 ต้องเสิร์ฟด้วยตัวที่
   fallback ไป `404.html` หรือเทสหน้าสติกเกอร์แยกจาก console

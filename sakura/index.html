@@ -36,7 +36,7 @@
           LEVELS, el, esc, normalizeState, stageForGrowth, localDateKey,
           buyItem, tendTree, mintCoins, awardGame, renderHome, renderShop, renderGame,
         } = SakuraKit;
-        const { QS, API, API_IS_SECURE, verifyLaunchToken, callback, postToApp } = Launch;
+        const { QS, API, API_IS_SECURE, EMBEDDED, verifyLaunchToken, callback, postToApp } = Launch;
 
         const EXPECTED_AUD = QS.get('aud') || 'sakura-garden';
         const ASSET_ROOT = '../assets/sakura';
@@ -120,6 +120,18 @@
           return `บันทึกไป Dreambook ไม่สำเร็จ: ${err.message}`;
         };
 
+        // A 401 means the report token died while the garden sat open. Only the
+        // host can mint a new one — it re-launches and remounts this iframe — so
+        // hand the session back instead of showing a dead end no one can act on.
+        // Standalone there is no host to ask, so it falls through to friendlyError.
+        const handOffExpired = (err) => {
+          if (err.status !== 401 || !EMBEDDED) return false;
+          pendingSync = false;
+          postToApp('activity_error', { code: 'session_expired', message: 'เวลารายงานผลหมดแล้ว' });
+          home('กำลังเชื่อมต่อกับ Dreambook อีกครั้ง…');
+          return true;
+        };
+
         async function syncLevels() {
           const target = stageForGrowth(state.growth).level;
           const newlyGranted = [];
@@ -129,7 +141,7 @@
               'PUT',
               `/activities/${encodeURIComponent(claims.activity_id)}/progress`,
               claims.report_token,
-              { level, result_id: `sakura-l${level}` },
+              { level },
             );
             state.reportedLevels = [...state.reportedLevels, level].sort((a, b) => a - b);
             // Empty on an idempotent retry of a level already recorded, so
@@ -142,7 +154,6 @@
             // has not written yet.
             postToApp('level_complete', {
               level,
-              result_id: `sakura-l${level}`,
               granted,
               ...(stamp?.sticker_id ? { sticker_id: stamp.sticker_id } : {}),
               done: state.reportedLevels.length,
@@ -212,6 +223,7 @@
             pendingSync = false;
             home(granted.length ? `${result.message} · ได้สติกเกอร์ระดับ ${granted.at(-1)}` : result.message);
           } catch (err) {
+            if (handOffExpired(err)) return;
             if (err.code === 'run_closed') { state.closed = true; save(); }
             pendingSync = !err.status || err.status >= 500 || err.status === 429;
             home(friendlyError(err), 'error');
@@ -226,6 +238,7 @@
             pendingSync = false;
             home(granted.length ? `บันทึกแล้ว · ได้สติกเกอร์ระดับ ${granted.at(-1)}` : 'บันทึกการเติบโตแล้ว');
           } catch (err) {
+            if (handOffExpired(err)) return;
             pendingSync = !err.status || err.status >= 500 || err.status === 429;
             home(friendlyError(err), 'error');
           }
@@ -265,6 +278,7 @@
             });
             home('กิจกรรมสำเร็จ ต้นซากุระทั้ง 5 ระดับถูกบันทึกแล้ว');
           } catch (err) {
+            if (handOffExpired(err)) return;
             if (err.code === 'run_closed') { state.closed = true; save(); return home('กิจกรรมรอบนี้จบแล้ว'); }
             home(friendlyError(err), 'error');
           }
@@ -299,6 +313,7 @@
             pendingSync = false;
             home(granted.length ? 'เริ่มปลูกแล้ว · ได้สติกเกอร์ต้นกล้าระดับ 1' : 'กลับมาดูแลต้นซากุระต่อกัน');
           } catch (err) {
+            if (handOffExpired(err)) return;
             if (err.code === 'run_closed') { state.closed = true; save(); }
             pendingSync = !err.status || err.status >= 500 || err.status === 429;
             home(friendlyError(err), 'error');

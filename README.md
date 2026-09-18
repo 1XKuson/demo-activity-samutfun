@@ -8,7 +8,8 @@
 | คำถามชวนคิด | `single` | 1 | `/` | ตอบถูกครบ 3 ข้อ → รายงาน level 1 + ปิด run ในครั้งเดียว |
 | ซากุระของฉัน | `continuous` | 1–5 | `/sakura` | เล่นเกม 24 หาเหรียญ ซื้อน้ำ/ปุ๋ย ดูแลรายวันจนต้นไม้โตเต็มที่ |
 
-สเปกที่ implement ตาม: `dreambook-backend/documents/activity-integration-guideline.md`
+สเปกที่ implement ตาม: `dreambook-backend/documents/activity/spec.md`
+(สรุปสั้น + แผนที่ว่าไฟล์ไหนตรงกับข้อไหน: [`activity-integration-guideline.md`](activity-integration-guideline.md))
 
 ## มีอะไรบ้าง
 
@@ -42,12 +43,13 @@
 | 5 | ควิซ 3 ข้อ ตอบผิดได้ ไม่มีโทษ ตอบใหม่จนถูก |
 | 6 | ครบ 3 ข้อ → `PUT /activities/:id/progress` ด้วย `{ level: 1, result_id, completed: true }` → backend บันทึก checkpoint แจกสแตมป์ของ level 1 แล้วปิด run |
 | 7 | PUT สำเร็จแล้วค่อย `postToApp('activity_finished', …)` ไปที่ `window.parent` → แอปปิด iframe เปิดหน้า "ได้รับสแตมป์ใหม่" (ทุกหน้ายิง `/sakura` ยิง `level_complete` รายด่านด้วย — ดู [แจ้งผลกลับแอป](#แจ้งผลกลับแอปหลังจบกิจกรรม)) |
-| 8 | เปิดสแตมป์ในสมุดบันทึกทีหลัง → แอป iframe `/activity/result/<result_id>` → เห็นเฉลยทั้ง 3 ข้อ |
+| 8 | กด **ดูผล** ในแอป (มาจาก `last_run.result_url` ของ run นั้น) → เปิด `/activity/result/<result_id>` แท็บใหม่ → เห็นเฉลยทั้ง 3 ข้อ |
 
 ### route `/activity/result/<result_id>` — หน้าเฉลย
 
-แอปเปิดหน้านี้ใน iframe ตอนกดสแตมป์ในสมุดบันทึก (`ActivityResultView.tsx`) — **เปิดเย็น ๆ
-ไม่มี token ไม่มี session ไม่มี callback** URL สร้างจาก backend เป็น
+แอปเปิดหน้านี้จากปุ่ม **ดูผล** (หน้าจบกิจกรรม กับหน้าสแกน QR) — **เปิดเย็น ๆ
+ไม่มี token ไม่มี session ไม่มี callback** ผลเป็นของ **run** ไม่ใช่ของสติกเกอร์
+(แตะสติกเกอร์ในสมุดจะเปิดหน้าคอลเลกชัน ไม่ใช่หน้านี้) URL สร้างจาก backend เป็น
 `<origin ของ web_url>/activity/result/<result_id>` (ดู `sticker.service.ts`)
 
 หน้านี้โชว์ **เฉลยคำถามทั้ง 3 ข้อ** — คำถามและคำตอบที่ถูกมาจาก `quiz.js` ชุดเดียวกับควิซ
@@ -183,17 +185,17 @@ run, callback และสแตมป์ยังเป็นของจริ
 ## แจ้งผลกลับแอปหลังจบกิจกรรม
 
 > ทุกหน้า (`/`, `/sakura`) ยิงผ่าน `Launch.postToApp()` ใน `launch.js`
-> ที่เดียว — guideline ตัด contract นี้ออกไปตอนแอปย้ายจาก iframe ไป WebView
-> (`window.parent === window` ทุก post เลยเป็น no-op) เก็บไว้เผื่อ host ที่ยัง
-> iframe อยู่ ไม่ว่าจะยิงหรือไม่ **callback ยังเป็นช่องทางเดียวที่ถือ state**
+> ที่เดียว — แอปฝังกิจกรรมด้วย **iframe** (spec §5.1) postMessage จึงเป็นช่องทาง
+> เดียวที่แอปรู้ว่าเกิดอะไรข้างใน · เปิดหน้าเดี่ยว ๆ `window.parent === window`
+> ทุก post เป็น no-op · ไม่ว่าจะยิงหรือไม่ **callback ยังเป็นช่องทางเดียวที่ถือ state**
 
 แอปรุ่นที่ฝังกิจกรรมไว้ใน **iframe** รู้ว่าจบแล้วผ่าน `postMessage` เท่านั้น
 (`ActivityPlayer.tsx`) — redirect ข้างในไม่ถึงแอป หน้าจอจะค้าง
 
 | type | ยิงเมื่อไหร่ | payload | หน้าไหน |
 |---|---|---|---|
-| `activity_error` | เปิดกิจกรรมไม่ได้ (ไม่มี token / API ไม่ HTTPS / verify ไม่ผ่าน) | `{ message }` | ทุกหน้า |
-| `level_complete` | บันทึก level หนึ่งสำเร็จ (PUT `{ level, result_id }` ได้ 2xx) | `{ level, result_id, granted, sticker_id?, done, total }` | `/sakura` |
+| `activity_error` | เปิดกิจกรรมไม่ได้ (ไม่มี token / API ไม่ HTTPS / verify ไม่ผ่าน) **หรือ PUT ตอบ 401** | `{ message, code? }` | ทุกหน้า |
+| `level_complete` | บันทึก level หนึ่งสำเร็จ (PUT `{ level }` ได้ 2xx) | `{ level, granted, sticker_id?, done, total }` | `/sakura` |
 | `activity_finished` | ปิดรอบสำเร็จ (PUT `{ completed: true }` ได้ 2xx) | ควิซ `{ result_id, sticker_code? }` · ซากุระ `{ levels, total }` | ทุกหน้า |
 
 | อยู่ที่ไหน | ทำอะไรตอนจบ |
@@ -209,9 +211,14 @@ run, callback และสแตมป์ยังเป็นของจริ
 - `stickerId` มาจาก `stamps_granted[0].sticker_id` ใน response ของ PUT (field `reward`
   หายไปตอน API เปลี่ยนเป็นระบบ level) ถ้า request นี้ไม่ได้แจกอะไร — เช่น ยิง level ซ้ำ —
   `stamps_granted` จะว่าง จะไม่ส่ง `sticker_code` และ fallback จะเด้งไป `/` เฉย ๆ
-- verify token ไม่ผ่าน → `activity_error` แอปจะโชว์ error แทน iframe
+- verify token ไม่ผ่าน → `activity_error` (ไม่มี `code`) แอปจะโชว์ error แทน iframe
 - ส่งผลไม่สำเร็จ (PUT พัง) → **ไม่** ยิง `activity_error` เพราะยังกู้ได้ ควิซโชว์ปุ่ม
   **ลองส่งใหม่** ซากุระกลับหน้าหลักพร้อมข้อความ error
+- **ยกเว้น 401** (report token หมดอายุ) — กู้เองไม่ได้ มีแต่แอปที่ออกใบใหม่ได้
+  `/sakura` จึงยิง `activity_error` พร้อม `code: 'session_expired'` แล้วแอปจะ launch
+  ใหม่และ remount iframe ให้ (spec §5.5) · เปิดหน้าเดี่ยวไม่มี host ก็ตกไปที่ข้อความเดิม
+- `result_id` เป็นของ **run** ไม่ใช่ของ level — `/sakura` ส่งครั้งเดียวตอนปิด run
+  (`sakura-l5`) `level_complete` จึงไม่มี field นี้
 - payload ไม่มี token และไม่มี PII เพราะ targetOrigin เป็น `'*'` (ใครก็อ่านได้)
 - fallback ใช้ `replace()` ไม่ใช่ `assign()` เพราะ launch token ใช้ครั้งเดียว — กด Back
   กลับมา URL เดิมจะโดน `jti` ซ้ำปฏิเสธ
@@ -269,7 +276,7 @@ https://1xkuson.github.io/demo-activity-samutfun/assets/stamp.png
 
 ### seed ของกิจกรรมต่อเนื่อง
 
-แถวใน `ActivityCatalog` ของ `/sakura` ต้องมีเพิ่มจากของควิซ (guideline ข้อ 2) —
+แถวใน `ActivityCatalog` ของ `/sakura` ต้องมีเพิ่มจากของควิซ (spec §6.3) —
 ค่าครบทุก field ทั้ง prod/dev อยู่ใน [`sakura/catalog.md`](sakura/catalog.md):
 
 | field | ค่า |
