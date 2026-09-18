@@ -66,14 +66,14 @@ function readConfig(hostname, pathname) {
   return JSON.parse(JSON.stringify(sandbox.window.APP_CONFIG));
 }
 assert.deepEqual(readConfig('1xkuson.github.io', '/demo-activity-samutfun/sakura/'), {
-  env: 'prod', api: 'https://api.samutfun.org', features: { mintCoins: false },
+  env: 'prod', api: 'https://api.samutfun.org', features: { devTools: false },
 });
 assert.deepEqual(readConfig('1xkuson.github.io', '/demo-activity-samutfun/dev/sakura/'), {
-  env: 'dev', api: 'https://api-dev.samutfun.org', features: { mintCoins: false },
+  env: 'dev', api: 'https://api-dev.samutfun.org', features: { devTools: false },
 });
 for (const host of ['localhost', '127.0.0.1']) {
   assert.deepEqual(readConfig(host, '/sakura/'), {
-    env: 'local', api: 'http://localhost:3000', features: { mintCoins: true },
+    env: 'local', api: 'http://localhost:3000', features: { devTools: true },
   });
 }
 // Hostname wins over path: a local checkout served under /dev/ is still local,

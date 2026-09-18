@@ -47,7 +47,20 @@
         // reports into a real backend.
         const ENV = window.APP_CONFIG?.env || 'prod';
         const ENV_LABEL = ENV === 'prod' ? '' : ENV.toUpperCase();
-        const allowMint = window.APP_CONFIG?.features?.mintCoins === true;
+        const allowDevTools = window.APP_CONFIG?.features?.devTools === true;
+
+        // Dev-only clock shift. Care is once per item per day, so testing the
+        // growth loop otherwise means waiting for tomorrow. It moves the date
+        // key only — the run, the callbacks and the stamps stay real. Persisted
+        // because a reload would otherwise snap back to a day whose water and
+        // fertilizer are already spent.
+        const DAY_MS = 86400000;
+        const DAY_OFFSET_KEY = 'demo-activity:sakura:dev-day-offset';
+        let dayOffset = 0;
+        if (allowDevTools) {
+          try { dayOffset = Number(localStorage.getItem(DAY_OFFSET_KEY)) || 0; } catch { /* dev tool */ }
+        }
+        const today = () => new Date(Date.now() + dayOffset * DAY_MS);
 
         let claims = null;
         let context = null;
@@ -142,8 +155,8 @@
         const commonHomeOptions = () => ({
           state,
           name: context?.nickname || claims.name || 'เพื่อน',
-          dateKey: localDateKey(),
-          dateLabel: new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short' }).format(new Date()),
+          dateKey: localDateKey(today()),
+          dateLabel: new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short' }).format(today()),
           assetRoot: ASSET_ROOT,
           envLabel: ENV_LABEL,
           status,
@@ -152,7 +165,8 @@
           onCare: care,
           onShop: shop,
           onGame: game,
-          onMint: allowMint ? mint : null,
+          onMint: allowDevTools ? mint : null,
+          onSkipDay: allowDevTools ? skipDay : null,
           onFinish: finish,
         });
 
@@ -188,7 +202,7 @@
         }
 
         async function care(itemKey) {
-          const result = tendTree(state, itemKey, localDateKey());
+          const result = tendTree(state, itemKey, localDateKey(today()));
           state = result.state;
           if (!result.ok) return home(result.message, 'error');
           save();
@@ -218,10 +232,17 @@
         }
 
         function mint() {
-          if (!allowMint) return;
+          if (!allowDevTools) return;
           state = mintCoins(state, 100);
           save();
           home('Dev mode เพิ่ม 100 เหรียญแล้ว');
+        }
+
+        function skipDay() {
+          if (!allowDevTools) return;
+          dayOffset += 1;
+          try { localStorage.setItem(DAY_OFFSET_KEY, String(dayOffset)); } catch { /* dev tool */ }
+          home(`Dev mode ข้ามไปวันที่ ${localDateKey(today())} แล้ว ดูแลต้นไม้ได้อีกรอบ`);
         }
 
         async function finish() {

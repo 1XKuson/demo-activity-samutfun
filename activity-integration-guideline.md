@@ -32,6 +32,10 @@ Dreambook backend — อธิบายว่า activity ต้อง implemen
         │        PUT  /activities/:id/progress          (WS2 return)
         ▼
   Dreambook backend  → บันทึก checkpoint, แจกสแตมป์ของ level นั้น, ปิด run ถ้าจบ
+        │
+        │  (ถ้า host ฝังด้วย iframe) activity postMessage บอกแอป
+        ▼
+  แอป Dreambook  → เด้งสแตมป์ใหม่ / ปิด iframe
 ```
 
 - `:id` = **ActivityInstance id** = ค่า claim `activity_id` ใน launch JWT (ตัวเดียวกัน)
@@ -196,6 +200,70 @@ Error:
 - run ไม่มีวันหมดอายุ: ยิง callback หลัง `available_to` ได้ตราบที่ run ยังไม่ปิด
   โดยช่วง availability มีผลเฉพาะตอนเริ่ม run ใหม่ ไม่ได้ปิด run ที่เริ่มไปแล้ว
 
+
+### 3.5 แจ้งผลกลับแอปด้วย postMessage
+
+ถ้าแอปฝัง activity ไว้ใน **iframe** สิ่งที่เกิดข้างใน (redirect, สแตมป์ใหม่, จบกิจกรรม)
+ไม่ถึงแอปเลย — activity ต้องยิง `postMessage` บอกเอง ส่วนใน **WebView**
+`window.parent === window` ทุก post เป็น no-op เขียนโค้ดชุดเดียวใช้ได้ทั้งสองแบบ
+
+```js
+const EMBEDDED = window.parent !== window;
+const postToApp = (type, extra) => {
+  if (!EMBEDDED) return;
+  try { window.parent.postMessage({ type, ...extra }, '*'); } catch (err) { console.warn(err); }
+};
+```
+
+| type                | ยิงเมื่อ                                                     | payload                                        |
+| ------------------- | ------------------------------------------------------------ | ---------------------------------------------- |
+| `activity_error`    | เปิดกิจกรรมไม่ได้ (ไม่มี token / verify ไม่ผ่าน / ไม่ HTTPS) | `{ message }`                                  |
+| `level_complete`    | `PUT /progress` ที่มี `level` ตอบ 2xx                        | `{ level, result_id?, granted, sticker_id? }`  |
+| `activity_finished` | `PUT /progress` ที่มี `completed: true` ตอบ 2xx              | `{ result_id?, levels? }`                      |
+
+**`level_complete` — ตามที่ `sakura-garden` ทำ** (1 level = 1 message):
+
+```jsonc
+{
+  "type": "level_complete",
+  "level": 3,
+  "result_id": "sakura-l3",
+  "granted": true,         // request นี้แจกสแตมป์จริงไหม
+  "sticker_id": "stk_…",   // มีเฉพาะตอน granted: true
+  "done": 3,               // optional; ฟิลด์เสริมของกิจกรรมเองใส่เพิ่มได้
+  "total": 5
+}
+```
+
+```js
+const res = await callback('PUT', `/activities/${activityId}/progress`,
+  reportToken, { level, result_id });
+// ว่าง = ยิงซ้ำ level ที่บันทึกไปแล้ว (idempotent ดู 3.4)
+const stamp = (res.stamps_granted || [])[0] || null;
+postToApp('level_complete', {
+  level,
+  result_id,
+  granted: !!stamp,
+  ...(stamp?.sticker_id ? { sticker_id: stamp.sticker_id } : {}),
+});
+```
+
+กฎ:
+
+- **ยิงหลัง PUT ได้ 2xx เท่านั้น** — ยิงก่อน backend เขียนเสร็จ แอปจะไปเปิดสแตมป์ที่ยังไม่มี
+- `granted` อ่านจาก `stamps_granted` ของ response นั้นเท่านั้น — ยิง level ซ้ำได้
+  `granted: false` และไม่มี `sticker_id` แอปจึงแยกสแตมป์ใหม่จริงออกจาก replay ได้
+- `sticker_id` มาจาก `stamps_granted[0].sticker_id` ห้าม activity ตั้ง id เอง (Dreambook
+  เลือกสแตมป์จาก level)
+- กิจกรรมหลาย level: ยิง `level_complete` ทีละ level ตามลำดับที่ PUT สำเร็จ แล้วค่อยยิง
+  `activity_finished` ตอนปิด run — ไม่ใช่ยิงรวมทีเดียวตอนจบ
+- PUT พัง → **ห้าม** ยิง `activity_error` (type นั้นแปลว่าเปิดกิจกรรมไม่ได้) ให้โชว์ปุ่ม
+  "ลองส่งใหม่" ในหน้าแทน เพราะ run ยังกู้ได้
+- `targetOrigin` เป็น `'*'` ใครก็อ่านได้ → payload ห้ามมี token หรือ PII (`name`, `class`)
+- postMessage เป็นแค่ UI hint — **callback คือช่องทางเดียวที่ถือ state จริง** ถ้าแอปไม่ฟัง
+  ข้อมูลก็ยังถูกต้องอยู่ดี
+
+
 ---
 
 ## 4. Config ที่ต้องตกลงกัน 2 ฝั่ง
@@ -218,6 +286,7 @@ Error:
 - [ ] ใช้ `report_token` เป็น bearer ตอน callback — อย่าเอา launch token ไปยิง callback
 - [ ] อย่า log token เต็ม ๆ (มี PII: `name`, `class`)
 - [ ] เรียก callback ผ่าน HTTPS เท่านั้น
+- [ ] payload ของ `postMessage` ไม่มี token / PII (`targetOrigin: '*'`)
 
 ---
 
@@ -254,3 +323,6 @@ Error:
 `src/activity/activity-callback.controller.ts` (callback routes),
 `src/auth/activity-session.guard.ts` (verify report/session token).
 เส้นทาง HTTP ทั้งหมดดูที่ [`routes.md`](routes.md).
+
+**อ้างอิงฝั่ง activity (repo นี้):** `launch.js` (verify + `postToApp`),
+`sakura/index.html` (`level_complete` รายด่าน + `activity_finished`).

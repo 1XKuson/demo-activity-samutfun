@@ -472,6 +472,7 @@ button:focus-visible {
 .dev-tools b { font-size: 13px; font-weight: 500; }
 .dev-tools small { font-size: 10px; line-height: 1.5; opacity: 0.75; }
 .dev-tools button { flex: none; display: flex; align-items: center; gap: 6px; padding: 8px 10px; font-size: 13px; }
+.dev-buttons { display: flex; flex: none; gap: 8px; }
 
 .finish-garden,
 .finish-garden + .garden-closed { margin-top: 24px; }

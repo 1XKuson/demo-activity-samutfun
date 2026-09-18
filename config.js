@@ -37,9 +37,10 @@ window.APP_CONFIG = {
     prod: 'https://api.samutfun.org',
   }[env],
   features: {
-    // Client-side garden coins only — this never mints a Dreambook reward.
+    // The garden's dev tools: free coins and a +1 day jump. Both are
+    // client-side only — neither mints a Dreambook reward nor moves the run.
     // Local only: a deployed dev page is still a real run against a real
-    // backend, so it gets the env ribbon but no free coins.
-    mintCoins: env === 'local',
+    // backend, so it gets the env ribbon but no tools.
+    devTools: env === 'local',
   },
 };

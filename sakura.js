@@ -240,7 +240,7 @@
         ${renderTrail(state, opts.assetRoot)}
       </section>
 
-      ${opts.onMint ? `<section class="dev-tools"><div><b>เครื่องมือ dev</b><small>เพิ่มเงินทดสอบได้ไม่จำกัด แสดงเฉพาะตอนรันบนเครื่อง</small></div><button type="button" data-mint>+100<span class="px px-coin" aria-hidden="true"></span></button></section>` : ''}
+      ${opts.onMint || opts.onSkipDay ? `<section class="dev-tools"><div><b>เครื่องมือ dev</b><small>เติมเหรียญและข้ามวันเพื่อทดสอบการดูแล แสดงเฉพาะตอนรันบนเครื่อง</small></div><div class="dev-buttons">${opts.onMint ? '<button type="button" data-mint>+100<span class="px px-coin" aria-hidden="true"></span></button>' : ''}${opts.onSkipDay ? '<button type="button" data-skip-day>+1 วัน</button>' : ''}</div></section>` : ''}
       ${stage.level === 5 && !state.closed && opts.onFinish ? '<button class="finish-garden" type="button" data-finish>จบกิจกรรมและเก็บสวนนี้ไว้</button>' : ''}
       ${state.closed ? '<p class="garden-closed">สวนรอบนี้จบสมบูรณ์แล้ว 🌸</p>' : ''}
     </div>`);
@@ -252,6 +252,7 @@
     screen.querySelector('[data-open="game"]')?.addEventListener('click', () => opts.onGame?.());
     screen.querySelector('[data-open="shop"]')?.addEventListener('click', () => opts.onShop?.());
     screen.querySelector('[data-mint]')?.addEventListener('click', () => opts.onMint?.());
+    screen.querySelector('[data-skip-day]')?.addEventListener('click', () => opts.onSkipDay?.());
     screen.querySelector('[data-finish]')?.addEventListener('click', () => opts.onFinish?.());
     screen.querySelector('[data-retry]')?.addEventListener('click', () => opts.onRetry?.());
   }
