@@ -22,5 +22,7 @@ if __name__ == "__main__":
     for n in range(1, 6):
         print(n, pixelize(f"assets/sakura/sticker-level-{n}.png",
                           f"assets/sakura/pixel/sticker-level-{n}.png", 64, 24))
-    print("thumb", pixelize("assets/sakura/thumbnail.png",
-                            "assets/sakura/pixel/thumbnail.png", 90, 32, bake=720))
+    # No thumbnail here on purpose: assets/sakura/pixel/thumbnail.png is
+    # hand-drawn pixel art with Thai text on it, and running it through this
+    # would smear the lettering into mush. Edit that file by hand.
+    print("thumbnail: hand-drawn, skipped")

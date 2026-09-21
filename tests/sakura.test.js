@@ -112,18 +112,22 @@ assert.deepEqual(bodyNodes.map((node) => node.src), [
 
 // Source art and the pixel cut the activity actually renders. imageForLevel
 // points at pixel/, so checking only the source would guard an unused file.
-const pngSize = (...parts) => {
+const pngSize = (colorType, ...parts) => {
   const png = fs.readFileSync(path.join(__dirname, '..', 'assets', 'sakura', ...parts));
-  assert.equal(png[25], 6, `${parts.join('/')} must be RGBA`);
+  assert.equal(png[25], colorType, `${parts.join('/')} PNG colour type must be ${colorType}`);
   return [png.readUInt32BE(16), png.readUInt32BE(20)];
 };
+// Stickers sit on the garden background, so they need real alpha (colour type 6).
 for (let level = 1; level <= 5; level += 1) {
-  assert.deepEqual(pngSize(`sticker-level-${level}.png`), [360, 360]);
-  assert.deepEqual(pngSize('pixel', `sticker-level-${level}.png`), [64, 64]);
+  assert.deepEqual(pngSize(6, `sticker-level-${level}.png`), [360, 360]);
+  assert.deepEqual(pngSize(6, 'pixel', `sticker-level-${level}.png`), [64, 64]);
   const rendered = K.imageForLevel(level, 'assets/sakura');
   assert.equal(rendered, `assets/sakura/pixel/sticker-level-${level}.png`);
   assert.ok(fs.existsSync(path.join(__dirname, '..', rendered)), `missing ${rendered}`);
 }
-assert.deepEqual(pngSize('pixel', 'thumbnail.png'), [720, 720]);
+// The thumbnail is hand-drawn pixel art with Thai text baked in, not a
+// pixelize.py cut of the source render: it ships at its authored size and is a
+// full-bleed opaque scene, so colour type 2 (RGB, no alpha channel) is correct.
+assert.deepEqual(pngSize(2, 'pixel', 'thumbnail.png'), [1254, 1254]);
 
 console.log(`sakura tests passed (${K.PUZZLES.length} fallback puzzles, random generator, 5 stickers)`);

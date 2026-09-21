@@ -18,10 +18,15 @@ full-bloom tree with a few falling petals.
 The activity renders from `pixel/`, not from these files. `pixel/` holds the
 same art cut down to a 64×64 grid with a 24-colour palette and hard alpha, so
 it matches the pixel-art UI when scaled back up with
-`image-rendering: pixelated`. `pixel/thumbnail.png` is baked back to 720×720
-with nearest-neighbour, because Dreambook renders the thumbnail with its own
-CSS and cannot be asked to turn smoothing off.
+`image-rendering: pixelated`.
 
-Regenerate with `tools/pixelize.py` (Pillow): box-downsample, threshold
-alpha at 50%, then median-cut quantise. Re-run it whenever the source art in
-this directory changes.
+Regenerate the stickers with `tools/pixelize.py` (Pillow): box-downsample,
+threshold alpha at 50%, then median-cut quantise. Re-run it whenever the source
+art in this directory changes.
+
+`pixel/thumbnail.png` is the exception — **hand-drawn pixel art, not a
+generated file.** It carries Thai lettering that no downsample survives, so it
+is not derived from `thumbnail.png` here and `pixelize.py` deliberately leaves
+it alone. Replace it by editing the art itself; it ships at its authored
+1254×1254 and is opaque RGB, since Dreambook renders it full-bleed and it
+needs no alpha.
