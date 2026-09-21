@@ -17,20 +17,24 @@
     </main>
 
     <script src="config.js"></script>
+    <script src="launch.js"></script>
     <script src="quiz.js"></script>
     <script>
       /**
        * Demo Activity — the smallest possible Dreambook external activity.
        * Answer 3 questions correctly => the run is complete.
        *
-       * Implements documents/activity-integration-guideline.md:
+       * Implements documents/activity/spec.md (dreambook-backend):
        *   1. read ?token         (launch JWT, RS256)
        *   2. verify it against <api>/.well-known/jwks.json  (WebCrypto, kid-matched)
+       *      — 1 and 2 live in launch.js, shared with /sakura
        *   3. GET  /activities/:id/student-context  with the report_token
        *   4. PUT  /activities/:id/progress         when all 3 are right
-       *   5. postMessage 'activity_finished' to window.parent (§3.5), so the
-       *      Dreambook app closes the iframe and shows "ได้รับสแตมป์ใหม่".
-       *      Standalone (not iframed): fall back to <return>/?sticker=<stickerId>
+       *   5. postMessage 'activity_finished' to window.parent — the app
+       *      embeds this in an iframe (spec §5.1), so this is the only way it
+       *      hears that the run closed. Opened standalone
+       *      window.parent === window and it is a no-op: fall back to
+       *      <return>/?sticker=<stickerId>
        *
        * No build step and no backend of its own: serve this file statically.
        * The questions and quiz rendering live in quiz.js, shared with /demo.
@@ -39,18 +43,7 @@
       const { QUESTIONS, AWARD_SVG, el, esc, renderQuiz } = QuizKit;
 
       // ---------- config ----------
-      const QS = new URLSearchParams(location.search);
-      // Where the backend lives: ?api= (debugging) beats config.js (the deployed
-      // default, see that file) beats localhost (a bare `git clone`).
-      const API = (QS.get('api') || window.APP_CONFIG?.api || 'http://localhost:3000').replace(
-        /\/$/,
-        '',
-      );
-      // Callbacks carry the report_token, so they go over HTTPS only (guideline
-      // §5). Plain-HTTP localhost stays allowed so a local backend still works.
-      const API_IS_SECURE =
-        /^https:\/\//.test(API) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(API);
-      const EXPECTED_ISS = QS.get('iss') || 'dreambook';
+      const { QS, API, API_IS_SECURE, EMBEDDED, verifyLaunchToken, callback, postToApp } = Launch;
       // Must match config.aud of this activity's ActivityCatalog row — that is
       // what the backend signs into the launch JWT (activity.service audFromConfig).
       const EXPECTED_AUD = QS.get('aud') || 'thailand-quiz';
@@ -58,41 +51,27 @@
       // (/activity/result/<result_id>), which serves the answer key — the same
       // page for every run, so one constant is all this needs to be.
       const RESULT_ID = 'demo-quiz-v1';
+      // This quiz is `single`: one level, reported and closed in the same PUT.
+      // The continuous activity next door reports one level per sitting instead.
+      const LEVEL = 1;
       // Where to send the student once progress is reported. Default '' → the
       // current origin's root (`/?sticker=…`), which is what the Dreambook web app
       // reads to open the sticker detail. ?return=https://app.example lets dev
       // point back at a web app served from another origin/port.
       const RETURN_BASE = (QS.get('return') || '').replace(/\/+$/, '');
       const REDIRECT_DELAY_MS = 1500;
-      // Launch TTL is capped at 900s on the Dreambook side; reject anything
-      // longer-lived, whatever the token claims (guideline §4).
-      const MAX_TOKEN_TTL_SEC = 900;
-      // The app embeds us in an iframe and only learns we finished via
-      // postMessage. Outside one (dev, direct link) fall back to a redirect.
-      const EMBEDDED = window.parent !== window;
+      // EMBEDDED/postToApp live in launch.js, shared with /sakura.
+      // Outside an iframe (dev, direct link) posting is a no-op, so fall back
+      // to a redirect.
 
       const app = document.getElementById('app');
-
-      /**
-       * Tell the host app what happened (guideline §3.5). Fire-and-forget: the
-       * callback is the authoritative channel, this only drives the app's UI.
-       * targetOrigin '*' means anyone can read it, so keep tokens and PII out.
-       */
-      const postToApp = (type, extra) => {
-        if (!EMBEDDED) return;
-        try {
-          window.parent.postMessage({ type, ...extra }, '*');
-        } catch (err) {
-          console.warn('postMessage failed:', err.message);
-        }
-      };
 
       /** Build the post-completion URL: <return>/?sticker=<stickerId>. */
       const returnUrl = (stickerId) =>
         `${RETURN_BASE}/${stickerId ? `?sticker=${encodeURIComponent(stickerId)}` : ''}`;
 
       const fail = (msg, detail) => {
-        // The app shows this message in place of the iframe (guideline §3.5).
+        // The app shows this message in place of the iframe.
         postToApp('activity_error', { message: msg });
         app.innerHTML = '';
         app.append(
@@ -103,93 +82,6 @@
                 <p class="footnote" style="margin-top:14px">เปิดกิจกรรมนี้จากปุ่มเล่นกิจกรรมในแอป Dreambook</p>
               </div>`),
         );
-      };
-
-      // ---------- JWT verify ----------
-      const b64urlToBytes = (s) => {
-        const b64 = s.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(s.length / 4) * 4, '=');
-        return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-      };
-      const b64urlToJson = (s) => JSON.parse(new TextDecoder().decode(b64urlToBytes(s)));
-
-      async function fetchJwks() {
-        const res = await fetch(`${API}/.well-known/jwks.json`, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`JWKS ${res.status}`);
-        return res.json();
-      }
-
-      /**
-       * Verify the launch JWT. Security checklist (guideline §5):
-       * RS256 only, signature against the kid-matched key, iss/aud/exp checked,
-       * jti single-use. Throws with a human-readable reason.
-       */
-      async function verifyLaunchToken(token) {
-        const parts = token.split('.');
-        if (parts.length !== 3) throw new Error('token ไม่ใช่ JWT');
-        const [rawHeader, rawPayload, rawSig] = parts;
-
-        const header = b64urlToJson(rawHeader);
-        // Reject `none`/HS256 before touching any key material (alg-confusion).
-        if (header.alg !== 'RS256') throw new Error(`alg=${header.alg} ไม่ได้รับอนุญาต (ต้องเป็น RS256)`);
-
-        const jwks = await fetchJwks();
-        const jwk = (jwks.keys || []).find((k) => !header.kid || k.kid === header.kid);
-        if (!jwk) throw new Error(`ไม่พบ public key ที่ตรงกับ kid=${header.kid}`);
-
-        const key = await crypto.subtle.importKey(
-          'jwk',
-          { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
-          { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-          false,
-          ['verify'],
-        );
-        const ok = await crypto.subtle.verify(
-          'RSASSA-PKCS1-v1_5',
-          key,
-          b64urlToBytes(rawSig),
-          new TextEncoder().encode(`${rawHeader}.${rawPayload}`),
-        );
-        if (!ok) throw new Error('ลายเซ็นไม่ถูกต้อง');
-
-        const claims = b64urlToJson(rawPayload);
-        if (claims.iss !== EXPECTED_ISS) throw new Error(`iss=${claims.iss} ไม่ตรงกับ ${EXPECTED_ISS}`);
-        const auds = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-        if (!auds.includes(EXPECTED_AUD)) throw new Error(`aud=${claims.aud} ไม่ตรงกับ ${EXPECTED_AUD}`);
-        const now = Math.floor(Date.now() / 1000);
-        if (typeof claims.exp !== 'number' || claims.exp <= now) throw new Error('token หมดอายุแล้ว');
-        // Cap the lifetime we accept regardless of what the token asks for, so a
-        // long-lived launch token can't be sat on and replayed (guideline §4).
-        if (claims.exp - now > MAX_TOKEN_TTL_SEC) throw new Error('token อายุยาวเกินกำหนด');
-        if (!claims.activity_id || !claims.report_token) throw new Error('token ไม่มี activity_id/report_token');
-
-        // Single-use: a launch token replayed from history must not start a new
-        // run. Storage can be unavailable in a partitioned third-party iframe
-        // (Safari ITP); losing replay protection must not block the activity.
-        if (claims.jti) {
-          const seenKey = `demo-activity:jti:${claims.jti}`;
-          try {
-            if (localStorage.getItem(seenKey)) throw new Error('token นี้ถูกใช้ไปแล้ว (เปิดกิจกรรมใหม่จากแอป)');
-            localStorage.setItem(seenKey, String(now));
-          } catch (err) {
-            if (err.message.startsWith('token นี้')) throw err;
-            console.warn('jti replay check unavailable:', err.message);
-          }
-        }
-        return claims;
-      }
-
-      // ---------- Dreambook callbacks ----------
-      const callback = async (method, path, reportToken, body) => {
-        const res = await fetch(`${API}${path}`, {
-          method,
-          headers: {
-            Authorization: `Bearer ${reportToken}`,
-            ...(body ? { 'Content-Type': 'application/json' } : {}),
-          },
-          ...(body ? { body: JSON.stringify(body) } : {}),
-        });
-        if (!res.ok) throw new Error(`${method} ${path} → ${res.status} ${await res.text()}`);
-        return res.json();
       };
 
       // ---------- quiz UI ----------
@@ -218,15 +110,16 @@
             'PUT',
             `/activities/${encodeURIComponent(claims.activity_id)}/progress`,
             claims.report_token,
-            {
-              result_id: RESULT_ID,
-              submission: { correct: QUESTIONS.length, total: QUESTIONS.length },
-            },
+            // A body with neither `level` nor `completed` is a 400 now
+            // (`level_or_completed_required`) — and the stamp comes from the
+            // level, never from a sticker id we pick.
+            { level: LEVEL, result_id: RESULT_ID, completed: true },
           );
-          // The reward is a StickerView; its id is what the app's journal reads
-          // from ?sticker= to open that sticker. Null when the activity instance
-          // carries no reward — then we just return to the app root.
-          const stickerId = result.reward?.id || null;
+          // The stamp of this level, if this request is what granted it (a retry
+          // of an already-recorded level returns an empty `stamps_granted`). Its
+          // id is what the app's journal reads from ?sticker= to open it.
+          const granted = (result.stamps_granted || [])[0] || null;
+          const stickerId = granted?.sticker_id || null;
           const next = returnUrl(stickerId);
 
           card.innerHTML = '';
@@ -236,14 +129,14 @@
                   ${AWARD_SVG}
                   <div class="award-copy center">
                     <h2 class="title-3">กิจกรรมสำเร็จ</h2>
-                    <p class="subhead">ตอบถูกครบ ${QUESTIONS.length} ข้อ${result.reward ? ' · ได้รับเหรียญแล้ว' : ''}</p>
+                    <p class="subhead">ตอบถูกครบ ${QUESTIONS.length} ข้อ${granted ? ' · ได้รับสแตมป์แล้ว' : ''}</p>
                     <p class="footnote">${EMBEDDED ? 'กำลังกลับไปที่ Dreambook' : `กำลังกลับไปที่ Dreambook · <a href="${esc(next)}">กลับเลย</a>`}</p>
                   </div>
                 </div>`),
           );
 
           // Only now that the PUT returned 2xx — announcing earlier makes the app
-          // look for a sticker the backend hasn't written yet (guideline §3.5).
+          // look for a sticker the backend hasn't written yet.
           if (EMBEDDED) {
             postToApp('activity_finished', {
               result_id: RESULT_ID,
@@ -281,7 +174,7 @@
 
         let claims;
         try {
-          claims = await verifyLaunchToken(token);
+          claims = await verifyLaunchToken(token, EXPECTED_AUD);
         } catch (err) {
           return fail('ตรวจสอบ token ไม่ผ่าน', err.message);
         }

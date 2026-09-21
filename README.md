@@ -1,9 +1,15 @@
 # demo-activity
 
-กิจกรรมทดสอบตัวเล็กที่สุดสำหรับ Dreambook — **ตอบถูกครบ 3 ข้อ = กิจกรรมสำเร็จ**
-ใช้พิสูจน์ว่า launch (Model-B handoff) + callback ทำงานครบ loop จริง
+กิจกรรมทดสอบสำหรับ Dreambook ใช้พิสูจน์ว่า launch (Model-B handoff) + callback
+ทำงานครบ loop จริง — ตอนนี้มี **2 กิจกรรม** ตาม `activity_type`
 
-สเปกที่ implement ตาม: `dreambook-backend/documents/activity-integration-guideline.md`
+| กิจกรรม | type | level | route | จบเมื่อ |
+|---|---|---|---|---|
+| คำถามชวนคิด | `single` | 1 | `/` | ตอบถูกครบ 3 ข้อ → รายงาน level 1 + ปิด run ในครั้งเดียว |
+| ซากุระของฉัน | `continuous` | 1–5 | `/sakura` | เล่นเกม 24 หาเหรียญ ซื้อน้ำ/ปุ๋ย ดูแลรายวันจนต้นไม้โตเต็มที่ |
+
+สเปกที่ implement ตาม: `dreambook-backend/documents/activity/spec.md`
+(สรุปสั้น + แผนที่ว่าไฟล์ไหนตรงกับข้อไหน: [`activity-integration-guideline.md`](activity-integration-guideline.md))
 
 ## มีอะไรบ้าง
 
@@ -11,12 +17,18 @@
 
 | ไฟล์ | ทำอะไร |
 |---|---|
-| [`index.html`](index.html) | route `/` — กิจกรรมจริง (verify launch JWT + callback กลับ Dreambook) |
-| [`demo/index.html`](demo/index.html) | route `/demo` — กิจกรรมเดียวกันแบบไม่ต่อ backend |
-| [`activity/result/index.html`](activity/result/index.html) | route `/activity/result/<result_id>` — หน้าเฉลย เปิดย้อนหลังจากสแตมป์ |
-| [`404.html`](404.html) | shim ให้ static host เสิร์ฟ path `/activity/result/<result_id>` ได้ |
-| [`quiz.js`](quiz.js) | คำถาม 3 ข้อ + render ควิซ + render เฉลย ใช้ร่วมกันทุก route |
-| [`result.js`](result.js) | bootstrap ของหน้าเฉลย |
+| [`launch.js`](launch.js) | **ใช้ร่วมกันทุกกิจกรรมจริง** — อ่าน+verify launch JWT (RS256/JWKS) และยิง callback ด้วย `report_token` |
+| [`index.html`](index.html) | route `/` — ควิซตัวจริง (single, level 1) |
+| [`demo/index.html`](demo/index.html) | route `/demo` — ควิซเดียวกันแบบไม่ต่อ backend |
+| [`quiz.js`](quiz.js) | คำถาม 3 ข้อ + render ควิซ + render เฉลย ใช้ร่วมกันทุก route ของควิซ |
+| [`result.js`](result.js) | bootstrap หน้าเฉลยของควิซ |
+| [`sakura/index.html`](sakura/index.html) | route `/sakura` — สวนจริงแบบ continuous + Dreambook callbacks |
+| [`sakura/demo/index.html`](sakura/demo/index.html) | route `/sakura/demo` — เล่นครบ loop ได้โดยไม่มี token/backend |
+| [`sakura.js`](sakura.js) | growth/economy/shop/เกม 24 และ renderer ที่ใช้ร่วมกันสอง route |
+| [`sakura-result.js`](sakura-result.js) | หน้าเปิดย้อนหลังจาก `result_id=sakura-l1..5` |
+| [`sakura/catalog.md`](sakura/catalog.md) | ค่าที่ต้อง seed ใน ActivityCatalog ทั้ง prod/dev และสติกเกอร์ทั้ง 5 level |
+| [`activity/result/index.html`](activity/result/index.html) | route `/activity/result/<result_id>` — หน้าเฉลย/สรุป เปิดย้อนหลังจากสแตมป์ |
+| [`404.html`](404.html) | shim ให้ static host เสิร์ฟ path `/activity/result/<result_id>` ได้ — แยกว่าเป็นของกิจกรรมไหนจาก `result_id` |
 | [`app.css`](app.css) | สไตล์ (Apple HIG tokens) ใช้ร่วมกันทุก route |
 | [`assets/`](assets) | รูป thumbnail + สแตมป์ ของกิจกรรม (ดูหัวข้อ [รูปกิจกรรม](#รูปกิจกรรม)) |
 
@@ -29,14 +41,15 @@
 | 3 | เช็ค `iss=dreambook`, `aud=thailand-quiz`, `exp` (cap 900 วิ), กัน `jti` ซ้ำผ่าน localStorage |
 | 4 | `GET /activities/:id/student-context` ด้วย `report_token` → ทักชื่อเล่น + ห้อง |
 | 5 | ควิซ 3 ข้อ ตอบผิดได้ ไม่มีโทษ ตอบใหม่จนถูก |
-| 6 | ครบ 3 ข้อ → `PUT /activities/:id/progress` → backend mark completed + แจกเหรียญ |
-| 7 | PUT สำเร็จแล้วค่อย `postMessage({type:'activity_finished'})` ไปที่ `window.parent` → แอปปิด iframe เปิดหน้า "ได้รับสแตมป์ใหม่" |
-| 8 | เปิดสแตมป์ในสมุดบันทึกทีหลัง → แอป iframe `/activity/result/<result_id>` → เห็นเฉลยทั้ง 3 ข้อ |
+| 6 | ครบ 3 ข้อ → `PUT /activities/:id/progress` ด้วย `{ level: 1, result_id, completed: true }` → backend บันทึก checkpoint แจกสแตมป์ของ level 1 แล้วปิด run |
+| 7 | PUT สำเร็จแล้วค่อย `postToApp('activity_finished', …)` ไปที่ `window.parent` → แอปปิด iframe เปิดหน้า "ได้รับสแตมป์ใหม่" (ทุกหน้ายิง `/sakura` ยิง `level_complete` รายด่านด้วย — ดู [แจ้งผลกลับแอป](#แจ้งผลกลับแอปหลังจบกิจกรรม)) |
+| 8 | กด **ดูผล** ในแอป (มาจาก `last_run.result_url` ของ run นั้น) → เปิด `/activity/result/<result_id>` แท็บใหม่ → เห็นเฉลยทั้ง 3 ข้อ |
 
 ### route `/activity/result/<result_id>` — หน้าเฉลย
 
-แอปเปิดหน้านี้ใน iframe ตอนกดสแตมป์ในสมุดบันทึก (`ActivityResultView.tsx`) — **เปิดเย็น ๆ
-ไม่มี token ไม่มี session ไม่มี callback** URL สร้างจาก backend เป็น
+แอปเปิดหน้านี้จากปุ่ม **ดูผล** (หน้าจบกิจกรรม กับหน้าสแกน QR) — **เปิดเย็น ๆ
+ไม่มี token ไม่มี session ไม่มี callback** ผลเป็นของ **run** ไม่ใช่ของสติกเกอร์
+(แตะสติกเกอร์ในสมุดจะเปิดหน้าคอลเลกชัน ไม่ใช่หน้านี้) URL สร้างจาก backend เป็น
 `<origin ของ web_url>/activity/result/<result_id>` (ดู `sticker.service.ts`)
 
 หน้านี้โชว์ **เฉลยคำถามทั้ง 3 ข้อ** — คำถามและคำตอบที่ถูกมาจาก `quiz.js` ชุดเดียวกับควิซ
@@ -67,6 +80,25 @@ result_url  https://1xkuson.github.io/demo-activity-samutfun/activity/result
 
 คำถามและหน้าตาควิซอยู่ใน `quiz.js` ไฟล์เดียว ทั้งสอง route จึงไม่มีทางเพี้ยนจากกัน
 
+## ซากุระของฉัน — `/sakura` (`continuous`, 5 level)
+
+ต้นซากุระโตตามการดูแลรายวัน: น้ำ `+1`, ปุ๋ย `+2`, ให้ได้ชนิดละหนึ่งครั้งต่อวัน
+และปลด level ที่ growth `0, 3, 6, 9, 12` ตามลำดับ เงินสำหรับซื้อของมาจาก
+เกม 24 ซึ่งสุ่มเลขโจทย์ 4 หลัก (1–9) แล้วให้ลาก/แตะบล็อกตัวเลข เครื่องหมายและวงเล็บ
+มาต่อเป็นสมการ ใช้เลขครบทั้ง 4 ใบและได้ผลลัพธ์ 24 จึงได้ 8 เหรียญ
+
+- `/sakura` verify launch token ด้วย `launch.js`, โหลด `student-context`, จำ state
+  แยกตาม `activity_id + student_id + run_id` และรายงาน checkpoint ทีละ level
+- โจทย์เกม 24 สุ่มใหม่ทุกครั้งและผ่านตัวแก้โจทย์ก่อนเสมอ จึงมีทางออกแน่นอน และ
+  คำใบ้กับปุ่มสุ่มใหม่ใช้ตัวแก้ตัวเดียวกัน
+- `/sakura/demo` ไม่มี backend เก็บ state ไว้ที่ `localStorage['sakura-garden:demo:v1']`
+  ของเครื่องนั้น (รวม `dayOffset`) มีปุ่มข้ามวันและปุ่มเริ่มใหม่สำหรับล้างข้อมูล
+- prod ไม่มีปุ่ม mint; dev (`/dev/` และ localhost) มีปุ่ม `+100` กดซ้ำได้ไม่จำกัด
+- ทุก level มี PNG RGBA 360×360 ใน `assets/sakura/` เท่ากับ stamp ของ activity เดิม
+- เมื่อถึง level 5 ผู้เรียนเป็นคนกดจบ run; ระบบไม่ปิด run ให้อัตโนมัติ
+
+ค่า seed ที่ต้องใส่ฝั่ง backend อยู่ใน [`sakura/catalog.md`](sakura/catalog.md)
+
 ## รัน
 
 ```bash
@@ -76,42 +108,72 @@ python3 -m http.server 5175
 ```
 
 backend ที่หน้านี้ยิงไปหา มาจาก `config.js` (`window.APP_CONFIG.api`) ซึ่งเลือกให้เอง
-**จาก path ที่ถูกเสิร์ฟ** (ดูหัวข้อ [environment](#environment)) — เปิดจากที่อื่น เช่น
-`python3 -m http.server` หรือ fork จะได้ prod (หน้านี้เป็น static ไม่มี build step
-`.env` จึงไปไม่ถึง browser)
+**จากที่อยู่ของหน้า** (ดูหัวข้อ [environment](#environment)) — เสิร์ฟจาก `localhost`
+หรือ `127.0.0.1` จะได้ env `local` ที่ยิงไป `http://localhost:3000` ทับได้ด้วย `?api=`
+หน้านี้เป็น static ไม่มี build step ดังนั้น `.env` จึงไปไม่ถึง browser
 
 ทับได้ด้วย query param โดยไม่ต้องแก้ไฟล์:
 
 | param | default | ใช้ทำอะไร |
 |---|---|---|
 | `token` | — | launch JWT (บังคับ) |
-| `api` | `config.js` (prod/dev ตาม path) | host ของ Dreambook backend — ต้องเป็น HTTPS ยกเว้น `localhost`/`127.0.0.1` (callback พก `report_token`) |
+| `api` | `config.js` (local/dev/prod ตามที่อยู่ของหน้า) | host ของ Dreambook backend — ต้องเป็น HTTPS ยกเว้น `localhost`/`127.0.0.1` (callback พก `report_token`) |
 | `iss` | `dreambook` | issuer ที่คาดหวัง |
-| `aud` | `thailand-quiz` | audience ที่คาดหวัง — ต้องตรงกับ `config.aud` ของแถวใน `ActivityCatalog` |
+| `aud` | `thailand-quiz` (`/`), `sakura-garden` (`/sakura`) | audience ที่คาดหวัง — ต้องตรงกับ `config.aud` ของแถวใน `ActivityCatalog` |
 | `return` | origin ปัจจุบัน | origin ของ web app ที่จะเด้งกลับหลังจบ (ใส่ตอน dev เมื่อ activity คนละ port กับแอป เช่น `http://localhost:5173`) |
 
 ## environment
 
-**2 env อยู่บน GitHub Pages site เดียวกัน คนละ path** — deploy ด้วย
+**2 env ที่ deploy อยู่บน GitHub Pages site เดียวกัน คนละ path** (บวก `local`
+สำหรับรันบนเครื่อง) — deploy ด้วย
 [`.github/workflows/pages.yml`](.github/workflows/pages.yml) ที่ checkout ทั้งสอง branch
 แล้วอัปเป็น artifact เดียว (Pages ทับทั้ง site ทุกครั้งที่ deploy — push branch ไหน
 ก็ build ใหม่ทั้งคู่)
 
-| env | branch | path | backend |
+| env | branch | ที่อยู่ | backend |
 |---|---|---|---|
 | prod | `main` | `https://1xkuson.github.io/demo-activity-samutfun/` | `https://api.samutfun.org` |
 | dev | `dev` | `https://1xkuson.github.io/demo-activity-samutfun/dev/` | `https://api-dev.samutfun.org` |
+| local | ไหนก็ได้ | `http://localhost:*` / `http://127.0.0.1:*` | `http://localhost:3000` |
 
-`config.js` เป็นไฟล์เดียวกันทั้งสอง branch — เลือก backend ตอน runtime จาก path
-(`/dev/` → dev, ที่เหลือ → prod) **ไม่ใช่** hardcode คนละค่าคนละ branch เพราะแบบนั้น
-merge `dev` → `main` เมื่อไหร่ prod จะโดน backend dev ลากไปด้วย
+`config.js` เป็นไฟล์เดียวกันทุก branch — เลือก backend ตอน runtime จากที่อยู่ของหน้า
+**ไม่ใช่** hardcode คนละค่าคนละ branch เพราะแบบนั้น merge `dev` → `main` เมื่อไหร่
+prod จะโดน backend dev ลากไปด้วย ลำดับการตัดสิน:
+
+1. hostname เป็น `localhost`/`127.0.0.1` → `local` (เช็คก่อน path เสมอ ดังนั้น
+   checkout ที่เสิร์ฟใต้ `/dev/` บนเครื่องก็ยังเป็น local)
+2. path มี `/dev/` → `dev`
+3. ที่เหลือ → `prod` — เป็น default ที่ปลอดภัยที่สุด เพราะถ้าเดาผิดจะไปตกที่
+   ตรวจ signature ไม่ผ่าน ไม่ใช่เขียนลง backend จริง
+
+`launch.js` ยอมให้ callback วิ่งบน plain http เฉพาะ `localhost`/`127.0.0.1` ที่เหลือ
+บังคับ HTTPS เพราะ callback พก `report_token`
+
+ริบบิ้นมุมขวาบนบอกชื่อ env ทุกครั้งที่ไม่ใช่ prod (`LOCAL` / `DEV`, หน้า
+`/sakura/demo` ขึ้น `DEMO`) — คนละเรื่องกับเครื่องมือ dev (ปุ่มเติมเหรียญ +100 และปุ่ม
+**+1 วัน** ที่ข้ามวันเพื่อดูแลต้นไม้ได้อีกรอบโดยไม่ต้องรอพรุ่งนี้) ซึ่งเปิดเฉพาะ `local`
+เพราะ dev ที่ deploy แล้วก็ยังรายงานเข้า backend จริง เปลี่ยนได้ที่
+`config.js` → `features.devTools`
+
+ปุ่ม +1 วันเลื่อนแค่ date key ที่หน้าเว็บใช้ (จำไว้ใน `localStorage` ข้ามรีโหลด)
+run, callback และสแตมป์ยังเป็นของจริงทั้งหมด
+
+| env | ริบบิ้น | เครื่องมือ dev |
+|---|---|---|
+| local | `LOCAL` | ✅ |
+| dev | `DEV` | ❌ |
+| prod | — | ❌ |
 
 ค่าที่ต้อง seed ลง `ActivityCatalog` ของ backend แต่ละตัว (backend คนละตัว = คนละแถว):
 
 | field | prod | dev |
 |---|---|---|
-| `web_url` | `https://1xkuson.github.io/demo-activity-samutfun` | `https://1xkuson.github.io/demo-activity-samutfun/dev` |
-| `result_url` | `https://1xkuson.github.io/demo-activity-samutfun/activity/result` | `https://1xkuson.github.io/demo-activity-samutfun/dev/activity/result` |
+| `web_url` (ควิซ) | `https://1xkuson.github.io/demo-activity-samutfun` | `https://1xkuson.github.io/demo-activity-samutfun/dev` |
+| `web_url` (ซากุระ) | `https://1xkuson.github.io/demo-activity-samutfun/sakura` | `https://1xkuson.github.io/demo-activity-samutfun/dev/sakura` |
+| `result_url` (ทุกกิจกรรม) | `https://1xkuson.github.io/demo-activity-samutfun/activity/result` | `https://1xkuson.github.io/demo-activity-samutfun/dev/activity/result` |
+
+ทั้งสอง activity ใช้ `result_url` เส้นเดียวกันได้ เพราะ `result_id` เป็นของเราเอง —
+`404.html` ดูจาก `result_id` ว่าจะ render เฉลยควิซ หรือสติกเกอร์ซากุระ
 
 หน้าเฉลยใต้ `/dev/` ใช้ `404.html` ใบเดียวกับ prod ได้ เพราะมัน derive site root จาก
 ตำแหน่งของ `/activity/result/` ใน path ไม่ได้ fix ว่าอยู่ที่ราก
@@ -122,19 +184,41 @@ merge `dev` → `main` เมื่อไหร่ prod จะโดน backend 
 
 ## แจ้งผลกลับแอปหลังจบกิจกรรม
 
-แอป Dreambook ฝังกิจกรรมไว้ใน **iframe** และรู้ว่าจบแล้วผ่าน `postMessage` เท่านั้น
+> ทุกหน้า (`/`, `/sakura`) ยิงผ่าน `Launch.postToApp()` ใน `launch.js`
+> ที่เดียว — แอปฝังกิจกรรมด้วย **iframe** (spec §5.1) postMessage จึงเป็นช่องทาง
+> เดียวที่แอปรู้ว่าเกิดอะไรข้างใน · เปิดหน้าเดี่ยว ๆ `window.parent === window`
+> ทุก post เป็น no-op · ไม่ว่าจะยิงหรือไม่ **callback ยังเป็นช่องทางเดียวที่ถือ state**
+
+แอปรุ่นที่ฝังกิจกรรมไว้ใน **iframe** รู้ว่าจบแล้วผ่าน `postMessage` เท่านั้น
 (`ActivityPlayer.tsx`) — redirect ข้างในไม่ถึงแอป หน้าจอจะค้าง
+
+| type | ยิงเมื่อไหร่ | payload | หน้าไหน |
+|---|---|---|---|
+| `activity_error` | เปิดกิจกรรมไม่ได้ (ไม่มี token / API ไม่ HTTPS / verify ไม่ผ่าน) **หรือ PUT ตอบ 401** | `{ message, code? }` | ทุกหน้า |
+| `level_complete` | บันทึก level หนึ่งสำเร็จ (PUT `{ level }` ได้ 2xx) | `{ level, granted, sticker_id?, done, total }` | `/sakura` |
+| `activity_finished` | ปิดรอบสำเร็จ (PUT `{ completed: true }` ได้ 2xx) | ควิซ `{ result_id, sticker_code? }` · ซากุระ `{ levels, total }` | ทุกหน้า |
 
 | อยู่ที่ไหน | ทำอะไรตอนจบ |
 |---|---|
-| ใน iframe (ของจริง) | `window.parent.postMessage({ type: 'activity_finished', result_id, sticker_code }, '*')` **หลัง** `PUT /progress` ได้ 2xx |
-| เปิดตรง ๆ ไม่มี parent (dev) | โชว์ผล ~1.5 วิ แล้ว `location.replace()` ไป `<return>/?sticker=<stickerId>` |
+| ใน iframe (ของจริง) | `postToApp(...)` ตามตารางข้างบน **หลัง** `PUT /progress` ได้ 2xx |
+| เปิดตรง ๆ ไม่มี parent (dev) | `EMBEDDED` เป็น false ไม่ยิงอะไร — ควิซโชว์ผล ~1.5 วิ แล้ว `location.replace()` ไป `<return>/?sticker=<stickerId>` |
 
 - ยิงหลัง PUT เสมอ — ยิงก่อน backend เขียนเสร็จ แอปจะหาเหรียญไม่เจอแล้วโชว์หน้าเปล่า
-- `stickerId` มาจาก `reward.id` ใน response ของ PUT ถ้ากิจกรรมไม่มีเหรียญ (`reward: null`)
-  จะไม่ส่ง `sticker_code` และ fallback จะเด้งไป `/` เฉย ๆ
-- verify token ไม่ผ่าน → `postMessage({ type: 'activity_error', message })` แอปจะโชว์ error แทน iframe
-- ส่งผลไม่สำเร็จ (PUT พัง) → **ไม่** ยิง `activity_error` เพราะยังกู้ได้ โชว์ปุ่ม **ลองส่งใหม่** แทน
+- `granted` เป็น false ตอนยิง level ซ้ำ (`stamps_granted` ว่าง เพราะ checkpoint idempotent) —
+  แอปจึงแยกได้ว่าอันไหนสแตมป์ใหม่จริง อันไหนแค่ replay
+- `sticker_id` มาจาก `stamps_granted[0].sticker_id` ของ response ไม่ใช่ id ที่หน้าเว็บตั้งเอง
+  (Dreambook เลือกสแตมป์จาก level) ตอน `granted:false` จะไม่มี field นี้เลย
+- `stickerId` มาจาก `stamps_granted[0].sticker_id` ใน response ของ PUT (field `reward`
+  หายไปตอน API เปลี่ยนเป็นระบบ level) ถ้า request นี้ไม่ได้แจกอะไร — เช่น ยิง level ซ้ำ —
+  `stamps_granted` จะว่าง จะไม่ส่ง `sticker_code` และ fallback จะเด้งไป `/` เฉย ๆ
+- verify token ไม่ผ่าน → `activity_error` (ไม่มี `code`) แอปจะโชว์ error แทน iframe
+- ส่งผลไม่สำเร็จ (PUT พัง) → **ไม่** ยิง `activity_error` เพราะยังกู้ได้ ควิซโชว์ปุ่ม
+  **ลองส่งใหม่** ซากุระกลับหน้าหลักพร้อมข้อความ error
+- **ยกเว้น 401** (report token หมดอายุ) — กู้เองไม่ได้ มีแต่แอปที่ออกใบใหม่ได้
+  `/sakura` จึงยิง `activity_error` พร้อม `code: 'session_expired'` แล้วแอปจะ launch
+  ใหม่และ remount iframe ให้ (spec §5.5) · เปิดหน้าเดี่ยวไม่มี host ก็ตกไปที่ข้อความเดิม
+- `result_id` เป็นของ **run** ไม่ใช่ของ level — `/sakura` ส่งครั้งเดียวตอนปิด run
+  (`sakura-l5`) `level_complete` จึงไม่มี field นี้
 - payload ไม่มี token และไม่มี PII เพราะ targetOrigin เป็น `'*'` (ใครก็อ่านได้)
 - fallback ใช้ `replace()` ไม่ใช่ `assign()` เพราะ launch token ใช้ครั้งเดียว — กด Back
   กลับมา URL เดิมจะโดน `jti` ซ้ำปฏิเสธ
@@ -184,6 +268,27 @@ https://1xkuson.github.io/demo-activity-samutfun/assets/stamp.png
      -H "Authorization: Bearer <student JWT>"
    ```
 4. เปิด `launchUrl` ในเบราว์เซอร์ → ตอบให้ครบ 3 ข้อ → ได้ **เหรียญนักทดสอบ**
+
+> แถวของควิซต้องมี `levels` อย่างน้อย 1 แถว (level 1) ด้วยแล้ว — API ใหม่แจกสแตมป์
+> จาก level เท่านั้น และ body ที่ไม่มีทั้ง `level` และ `completed` จะโดน 400
+> `level_or_completed_required` หน้า `/` เลยยิง `{ level: 1, result_id, completed: true }`
+> ในครั้งเดียว
+
+### seed ของกิจกรรมต่อเนื่อง
+
+แถวใน `ActivityCatalog` ของ `/sakura` ต้องมีเพิ่มจากของควิซ (spec §6.3) —
+ค่าครบทุก field ทั้ง prod/dev อยู่ใน [`sakura/catalog.md`](sakura/catalog.md):
+
+| field | ค่า |
+|---|---|
+| `activity_slug` | `sakura-garden` (ห้ามซ้ำกับกิจกรรมอื่น) |
+| `activity_type` | `continuous` — ถ้าใส่ `single` launch จะเปิด run ใหม่ทุกครั้ง ทำต่อไม่ได้ |
+| `config.aud` | `sakura-garden` (ตรงกับที่หน้านี้เช็ค) |
+| `web_url` | ตามตารางใน [environment](#environment) — ชี้ที่ `/sakura` ไม่ใช่ราก |
+| `levels` | 5 แถว เรียง 1–5 ห้ามข้าม แต่ละแถวผูกสแตมป์ 1 ใบ (`sticker` + `variant` + `image_url`) |
+
+**ห้ามลบหรือย้ายสแตมป์ของ level ที่แจกไปแล้ว** — ownership ของสแตมป์คือหลักฐานว่า
+นักเรียนผ่าน level นั้น เพิ่ม level ใหม่ต่อท้ายได้อย่างเดียว
 
 ### CORS
 

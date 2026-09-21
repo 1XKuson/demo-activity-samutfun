@@ -257,7 +257,7 @@ a:hover { text-decoration: underline; }
   }
 }
 
-/* ---------- filled button (demo route only: replay, no callback) ---------- */
+/* ---------- filled button ---------- */
 .btn {
   display: block;
   width: 100%;

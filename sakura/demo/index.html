@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#FFF9F7" />
+    <title>ตัวอย่าง — ซากุระของฉัน</title>
+    <link rel="stylesheet" href="../../app.css" />
+    <link rel="stylesheet" href="../../sakura.css" />
+  </head>
+  <body>
+    <main id="app" aria-label="ตัวอย่างกิจกรรมสวนซากุระ"></main>
+    <script src="../../sakura.js"></script>
+    <script>
+      (function () {
+        'use strict';
+        const {
+          GAME_REWARD, freshState, normalizeState, stageForGrowth, localDateKey,
+          buyItem, tendTree, mintCoins, awardGame, renderHome, renderShop, renderGame,
+        } = SakuraKit;
+        const app = document.getElementById('app');
+        const ASSET_ROOT = '../../assets/sakura';
+
+        // The demo has no backend, so its sandbox state lives in localStorage on
+        // this device only. One fixed key: there is no student or run to split by.
+        const STORAGE_KEY = 'sakura-garden:demo:v1';
+
+        const load = () => {
+          try {
+            const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || {};
+            return {
+              state: normalizeState(saved.state),
+              dayOffset: Math.max(0, Math.floor(Number(saved.dayOffset) || 0)),
+            };
+          } catch (err) {
+            console.warn('demo state unavailable:', err.message);
+            return { state: freshState(), dayOffset: 0 };
+          }
+        };
+
+        const save = () => {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ state, dayOffset }));
+          } catch (err) {
+            console.warn('demo state not saved:', err.message);
+          }
+        };
+
+        let { state, dayOffset } = load();
+
+        const demoDate = () => {
+          const date = new Date();
+          date.setDate(date.getDate() + dayOffset);
+          return date;
+        };
+
+        function home(message = 'โหมดทดลอง ไม่เชื่อมต่อ Dreambook', kind = '') {
+          save();
+          const date = demoDate();
+          renderHome(app, {
+            state,
+            name: 'เพื่อนนักปลูก',
+            dateKey: localDateKey(date),
+            dateLabel: new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short' }).format(date),
+            assetRoot: ASSET_ROOT,
+            envLabel: 'DEMO',
+            status: message,
+            statusKind: kind,
+            onCare: care,
+            onShop: shop,
+            onGame: game,
+            onMint: () => { state = mintCoins(state, 100); home('เพิ่ม 100 เหรียญแล้ว'); },
+            onFinish: () => { state.closed = true; home('ตัวอย่างกิจกรรมจบแล้ว'); },
+          });
+          // Reset stays available after the demo closes, otherwise a finished
+          // garden would now survive every reload with no way out.
+          const tools = document.createElement('section');
+          tools.className = 'dev-tools';
+          tools.innerHTML = `<div><b>เครื่องมือทดลอง</b><small>ข้ามวันเพื่อดู growth loop · สวนนี้ถูกจำไว้บนเครื่องนี้</small></div>${state.closed ? '' : '<button type="button" data-day>+1 วัน</button>'}<button type="button" data-reset>เริ่มใหม่</button>`;
+          tools.querySelector('[data-day]')?.addEventListener('click', () => { dayOffset += 1; home('ข้ามมาวันทดสอบถัดไปแล้ว'); });
+          tools.querySelector('[data-reset]').addEventListener('click', () => {
+            state = freshState();
+            dayOffset = 0;
+            home('ล้างข้อมูลเดโมบนเครื่องนี้แล้ว');
+          });
+          app.querySelector('.sakura-screen').append(tools);
+        }
+
+        function care(itemKey) {
+          const result = tendTree(state, itemKey, localDateKey(demoDate()));
+          state = result.state;
+          home(result.message, result.ok ? '' : 'error');
+        }
+
+        function shop(message = '', kind = '') {
+          save();
+          renderShop(app, {
+            state, status: message, statusKind: kind,
+            onBack: () => home(), onGame: game,
+            onBuy: (itemKey) => {
+              const result = buyItem(state, itemKey);
+              state = result.state;
+              shop(result.message, result.ok ? '' : 'error');
+            },
+          });
+        }
+
+        function game() {
+          renderGame(app, {
+            onBack: () => home(),
+            onWin: () => { state = awardGame(state); home(`ได้ ${GAME_REWARD} เหรียญจากเกม 24`); },
+          });
+        }
+
+        home();
+      })();
+    </script>
+  </body>
+</html>

@@ -43,8 +43,22 @@
         css.href = base + 'app.css';
         document.head.append(css);
 
-        // async=false keeps quiz.js ahead of result.js, which depends on it.
-        for (const src of ['quiz.js', 'result.js']) {
+        // Activities share this shim and choose their cold result renderer by
+        // result_id. Anything unrecognised remains the original quiz result.
+        const id = location.pathname.slice(at + MARKER.length).replace(/\/+$/, '');
+        const isSakura = /^sakura-l[1-5]$/.test(id);
+        document.title = isSakura ? 'สติกเกอร์จากสวนซากุระ' : 'เฉลยกิจกรรม — คำถามชวนคิด';
+
+        if (isSakura) {
+          const sakuraCss = document.createElement('link');
+          sakuraCss.rel = 'stylesheet';
+          sakuraCss.href = base + 'sakura.css';
+          document.head.append(sakuraCss);
+        }
+
+        // async=false keeps the kit ahead of the bootstrap, which depends on it.
+        const scripts = isSakura ? ['sakura.js', 'sakura-result.js'] : ['quiz.js', 'result.js'];
+        for (const src of scripts) {
           const s = document.createElement('script');
           s.src = base + src;
           s.async = false;
