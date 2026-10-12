@@ -1,2 +1,6 @@
 .DS_Store
 node_modules/
+
+# superpowers: specs are shared; plans and task logs stay local
+docs/superpowers/plans/
+.superpowers/
