@@ -1,0 +1,44 @@
+name: Backmerge
+
+# Every push to `sit` (a merged feature PR) is merged back into `dev` so `dev`
+# never drifts behind. On conflict, opens a sit -> dev PR to resolve by hand.
+# Note: pushes made with GITHUB_TOKEN don't trigger other workflows, so `dev`
+# is not redeployed by this; the next push to `dev` deploys it.
+on:
+  push:
+    branches: [sit]
+
+concurrency:
+  group: backmerge
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  backmerge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Merge sit into dev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          if git merge --no-edit -m "chore: backmerge sit into dev" origin/sit; then
+            git push origin dev
+            exit 0
+          fi
+          git merge --abort
+          echo "::warning::sit -> dev has conflicts; resolve them in a sit -> dev PR"
+          if [ "$(gh pr list --base dev --head sit --state open --json number --jq length)" = 0 ]; then
+            gh pr create --base dev --head sit --title "Backmerge sit into dev" \
+              --body "Auto-backmerge hit a conflict. Resolve it here and merge (merge commit, not squash)." \
+              || { echo "::error::Could not open PR. Open it by hand: ${{ github.server_url }}/${{ github.repository }}/compare/dev...sit"; exit 1; }
+          fi
