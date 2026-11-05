@@ -14,14 +14,21 @@
 (function (global) {
   const QS = new URLSearchParams(location.search);
 
-  // Where the backend lives: ?api= (debugging) beats config.js (the deployed
-  // default, see that file) beats localhost (a bare `git clone`).
-  const API = (QS.get('api') || global.APP_CONFIG?.api || 'http://localhost:3000').replace(/\/$/, '');
+  // Trusted issuers -> backend origin. ?api= (+ ?iss=, debugging) beats
+  // config.js (the deployed default, see that file) beats localhost (a bare
+  // `git clone`). The token's `iss` picks the entry, so one page can serve
+  // backends that sign with different keys (dev and sit).
+  const ISSUERS = QS.get('api')
+    ? { [QS.get('iss') || 'dreambook']: QS.get('api') }
+    : global.APP_CONFIG?.issuers || { dreambook: 'http://localhost:3000' };
+  const origin = (url) => url.replace(/\/$/, '');
   // Callbacks carry the report_token, so they go over HTTPS only (spec §3.2).
   // Plain-HTTP localhost stays allowed so a local backend still works.
-  const API_IS_SECURE =
-    /^https:\/\//.test(API) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(API);
-  const EXPECTED_ISS = QS.get('iss') || 'dreambook';
+  const isSecure = (url) =>
+    /^https:\/\//.test(url) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(url);
+  const API_IS_SECURE = Object.values(ISSUERS).every(isSecure);
+  // Set from the verified token's `iss`; until then, the first listed backend.
+  let API = origin(Object.values(ISSUERS)[0]);
   // Dreambook mints launch tokens with a ~600s TTL; reject anything much
   // longer-lived, whatever the token claims (spec §3.3).
   const MAX_TOKEN_TTL_SEC = 900;
@@ -33,8 +40,8 @@
   };
   const b64urlToJson = (s) => JSON.parse(new TextDecoder().decode(b64urlToBytes(s)));
 
-  async function fetchJwks() {
-    const res = await fetch(`${API}/.well-known/jwks.json`, { cache: 'no-store' });
+  async function fetchJwks(api) {
+    const res = await fetch(`${api}/.well-known/jwks.json`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`JWKS ${res.status}`);
     return res.json();
   }
@@ -58,7 +65,13 @@
 
     if (typeof header.kid !== 'string' || !header.kid) throw new Error('token ไม่มี kid สำหรับเลือก public key');
 
-    const jwks = await fetchJwks();
+    // The unverified `iss` only chooses which trusted backend's keys to check
+    // against; a token signed by another backend fails the kid/signature check.
+    const iss = b64urlToJson(rawPayload).iss;
+    if (typeof iss !== 'string' || !Object.hasOwn(ISSUERS, iss)) throw new Error(`iss=${iss} ไม่อยู่ในรายชื่อที่เชื่อถือ`);
+    const api = origin(ISSUERS[iss]);
+
+    const jwks = await fetchJwks(api);
     const jwk = (jwks.keys || []).find(
       (k) => k.kid === header.kid && k.kty === 'RSA' && k.alg === 'RS256' && (!k.use || k.use === 'sig'),
     );
@@ -80,7 +93,6 @@
     if (!ok) throw new Error('ลายเซ็นไม่ถูกต้อง');
 
     const claims = b64urlToJson(rawPayload);
-    if (claims.iss !== EXPECTED_ISS) throw new Error(`iss=${claims.iss} ไม่ตรงกับ ${EXPECTED_ISS}`);
     const auds = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
     if (!auds.includes(expectedAud)) throw new Error(`aud=${claims.aud} ไม่ตรงกับ ${expectedAud}`);
     const now = Math.floor(Date.now() / 1000);
@@ -106,6 +118,7 @@
         console.warn('jti replay check unavailable:', err.message);
       }
     }
+    API = api;
     return claims;
   }
 
@@ -165,5 +178,16 @@
     throw err;
   };
 
-  global.Launch = { QS, API, API_IS_SECURE, EXPECTED_ISS, MAX_TOKEN_TTL_SEC, EMBEDDED, verifyLaunchToken, callback, postToApp };
+  global.Launch = {
+    QS,
+    get API() {
+      return API;
+    },
+    API_IS_SECURE,
+    MAX_TOKEN_TTL_SEC,
+    EMBEDDED,
+    verifyLaunchToken,
+    callback,
+    postToApp,
+  };
 })(window);

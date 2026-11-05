@@ -38,7 +38,7 @@
 |---|---|
 | 1 | อ่าน `?token=` จาก URL (launch JWT) |
 | 2 | verify RS256 ด้วย WebCrypto กับ `<api>/.well-known/jwks.json` (เลือกกุญแจตาม `kid`) |
-| 3 | เช็ค `iss=dreambook`, `aud=thailand-quiz`, `exp` (cap 900 วิ), กัน `jti` ซ้ำผ่าน localStorage |
+| 3 | เช็คว่า `iss` อยู่ใน `config.js` `issuers` (เลือก backend ที่ใช้ verify + callback), `aud=thailand-quiz`, `exp` (cap 900 วิ), กัน `jti` ซ้ำผ่าน localStorage |
 | 4 | `GET /activities/:id/student-context` ด้วย `report_token` → ทักชื่อเล่น + ห้อง |
 | 5 | ควิซ 3 ข้อ ตอบผิดได้ ไม่มีโทษ ตอบใหม่จนถูก |
 | 6 | ครบ 3 ข้อ → `PUT /activities/:id/progress` ด้วย `{ level: 1, result_id, completed: true }` → backend บันทึก checkpoint แจกสแตมป์ของ level 1 แล้วปิด run |
@@ -107,7 +107,7 @@ python3 -m http.server 5175
 # หรือ: npx serve -l 5175 .
 ```
 
-backend ที่หน้านี้ยิงไปหา มาจาก `config.js` (`window.APP_CONFIG.api`) ซึ่งเลือกให้เอง
+backend ที่หน้านี้ยิงไปหา มาจาก `config.js` (`window.APP_CONFIG.issuers`: `iss` → backend) ซึ่งเลือกให้เอง
 **จากที่อยู่ของหน้า** (ดูหัวข้อ [environment](#environment)) — เสิร์ฟจาก `localhost`
 หรือ `127.0.0.1` จะได้ env `local` ที่ยิงไป `http://localhost:3000` ทับได้ด้วย `?api=`
 หน้านี้เป็น static ไม่มี build step ดังนั้น `.env` จึงไปไม่ถึง browser
@@ -117,8 +117,8 @@ backend ที่หน้านี้ยิงไปหา มาจาก `con
 | param | default | ใช้ทำอะไร |
 |---|---|---|
 | `token` | — | launch JWT (บังคับ) |
-| `api` | `config.js` (local/dev/prod ตามที่อยู่ของหน้า) | host ของ Dreambook backend — ต้องเป็น HTTPS ยกเว้น `localhost`/`127.0.0.1` (callback พก `report_token`) |
-| `iss` | `dreambook` | issuer ที่คาดหวัง |
+| `api` | `config.js` (local/dev/prod ตามที่อยู่ของหน้า) | host ของ Dreambook backend — ใส่แล้วจะเชื่อแค่ backend นี้กับ `iss` ข้างล่าง — ต้องเป็น HTTPS ยกเว้น `localhost`/`127.0.0.1` (callback พก `report_token`) |
+| `iss` | `dreambook` | issuer ที่คาดหวัง (ใช้คู่กับ `api` เท่านั้น) |
 | `aud` | `thailand-quiz` (`/`), `sakura-garden` (`/sakura`) | audience ที่คาดหวัง — ต้องตรงกับ `config.aud` ของแถวใน `ActivityCatalog` |
 | `return` | origin ปัจจุบัน | origin ของ web app ที่จะเด้งกลับหลังจบ (ใส่ตอน dev เมื่อ activity คนละ port กับแอป เช่น `http://localhost:5173`) |
 
@@ -133,7 +133,7 @@ backend ที่หน้านี้ยิงไปหา มาจาก `con
 | env | branch | ที่อยู่ | backend |
 |---|---|---|---|
 | prod | `main` | `https://1xkuson.github.io/demo-activity-samutfun/` | `https://api.samutfun.org` |
-| dev | `dev` | `https://1xkuson.github.io/demo-activity-samutfun/dev/` | `https://api-dev.samutfun.org` |
+| dev (+ sit) | `dev` | `https://1xkuson.github.io/demo-activity-samutfun/dev/` | `iss=dreambook` → `https://api-dev.samutfun.org`, `iss=dreambook-sit` → `https://api-sit.samutfun.org` |
 | local | ไหนก็ได้ | `http://localhost:*` / `http://127.0.0.1:*` | `http://localhost:3000` |
 
 `config.js` เป็นไฟล์เดียวกันทุก branch — เลือก backend ตอน runtime จากที่อยู่ของหน้า
