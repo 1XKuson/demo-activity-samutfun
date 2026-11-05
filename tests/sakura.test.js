@@ -66,19 +66,21 @@ function readConfig(hostname, pathname) {
   return JSON.parse(JSON.stringify(sandbox.window.APP_CONFIG));
 }
 assert.deepEqual(readConfig('1xkuson.github.io', '/demo-activity-samutfun/sakura/'), {
-  env: 'prod', api: 'https://api.samutfun.org', features: { devTools: false },
+  env: 'prod', issuers: { dreambook: 'https://api.samutfun.org' }, features: { devTools: false },
 });
 assert.deepEqual(readConfig('1xkuson.github.io', '/demo-activity-samutfun/dev/sakura/'), {
-  env: 'dev', api: 'https://api-dev.samutfun.org', features: { devTools: false },
+  env: 'dev',
+  issuers: { dreambook: 'https://api-dev.samutfun.org', 'dreambook-sit': 'https://api-sit.samutfun.org' },
+  features: { devTools: false },
 });
 for (const host of ['localhost', '127.0.0.1']) {
   assert.deepEqual(readConfig(host, '/sakura/'), {
-    env: 'local', api: 'http://localhost:3000', features: { devTools: true },
+    env: 'local', issuers: { dreambook: 'http://localhost:3000' }, features: { devTools: true },
   });
 }
 // Hostname wins over path: a local checkout served under /dev/ is still local,
 // so a stray dev/ directory can never aim a laptop at the deployed backend.
-assert.equal(readConfig('localhost', '/dev/sakura/').api, 'http://localhost:3000');
+assert.equal(readConfig('localhost', '/dev/sakura/').env, 'local');
 // Unknown hosts fall back to prod, where a wrong guess fails signature
 // verification instead of writing somewhere real.
 assert.equal(readConfig('example.test', '/sakura/').env, 'prod');
