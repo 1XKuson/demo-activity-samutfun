@@ -9,7 +9,7 @@ const source = fs.readFileSync(path.join(__dirname, '..', 'launch.js'), 'utf8');
 function loadLaunch({ embedded, throws = false }) {
   const posted = [];
   const window = {
-    APP_CONFIG: { api: 'https://api.example' },
+    APP_CONFIG: { issuers: { dreambook: 'https://api.example' } },
     postMessage: (data, targetOrigin) => {
       if (throws) throw new Error('blocked');
       posted.push({ data, targetOrigin });
